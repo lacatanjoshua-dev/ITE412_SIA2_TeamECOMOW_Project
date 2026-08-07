@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Smart Lawn Mower UI Design</string>
+    <string name="title_activity_main">Smart Lawn Mower UI Design</string>
+    <string name="package_name">com.mower.Ecomow</string>
+    <string name="custom_url_scheme">com.mower.Ecomow</string>
+</resources>

@@ -1,0 +1,57 @@
+:root {
+  /* Nature-inspired color palette - Updated from image */
+  --color-primary: #628141;      /* Moss Green */
+  --color-primary-dark: #40513B; 
+  --color-primary-light: #E5D9B6; 
+  --color-secondary: #E67E22;    
+  --color-background: #F8FAF7;   
+  --color-surface: #ffffff;
+  --color-text: #2C3627;         
+  --color-text-light: #6D7C66;
+  --color-border: #E5D9B6;
+  --color-error: #ef4444;
+  --color-success: #628141;
+  --color-warning: #E67E22;
+  --color-solar: #E67E22;
+  --color-accent-green: #40513B;
+  --color-accent-light: #E5D9B6;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+    monospace;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-light);
+}
+

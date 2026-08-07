@@ -1,0 +1,6 @@
+{
+  "appId": "com.mower.app",
+  "appName": "Smart Lawn Mower",
+  "webDir": "build",
+  "bundledWebRuntime": false
+}
