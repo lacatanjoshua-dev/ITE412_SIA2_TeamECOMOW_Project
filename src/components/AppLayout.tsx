@@ -1,6 +1,3 @@
-
-
-
 import React, { useEffect, useState } from "react";
 import {
   Link,
@@ -30,7 +27,11 @@ import {
   AnimatePresence,
 } from "framer-motion";
 
-import { auth, db, realtimeDb } from "../firebase";
+import {
+  auth,
+  db,
+  realtimeDb,
+} from "../firebase";
 
 import {
   onAuthStateChanged,
@@ -51,16 +52,24 @@ import {
   onValue,
 } from "firebase/database";
 
-// ============================================
+// =====================================================
 // IMAGES
-// ============================================
+// =====================================================
 
 const logoImage = "/images/logo.jpg";
 const bgImage = "/images/mower.jpg";
 
-// ============================================
-// CONNECT MODAL
-// ============================================
+// =====================================================
+// PROPS
+// =====================================================
+
+interface AppLayoutProps {
+  onLogout: () => Promise<void>;
+}
+
+// =====================================================
+// CONNECT MODAL PROPS
+// =====================================================
 
 interface ConnectContentProps {
   connected: boolean;
@@ -69,6 +78,10 @@ interface ConnectContentProps {
   close: () => void;
 }
 
+// =====================================================
+// CONNECT MODAL
+// =====================================================
+
 const ConnectContent = ({
   connected,
   connecting,
@@ -76,12 +89,16 @@ const ConnectContent = ({
   close,
 }: ConnectContentProps) => {
   return (
-    <>
-      <div className="flex justify-between items-center mb-5">
+    <div>
+
+      {/* HEADER */}
+
+      <div className="flex items-center justify-between mb-5">
+
         <div>
-          <h3 className="text-xl font-bold text-gray-800">
+          <h2 className="text-xl font-black text-gray-800">
             Mower Connection
-          </h3>
+          </h2>
 
           <p className="text-xs text-gray-500 mt-1">
             Firebase cloud connection
@@ -94,12 +111,15 @@ const ConnectContent = ({
         >
           <X size={18} />
         </button>
+
       </div>
 
       <div className="space-y-3">
 
-        {/* WIFI / INTERNET STATUS */}
+        {/* FIREBASE */}
+
         <div className="flex items-center gap-4 w-full border rounded-xl p-4">
+
           <Wifi
             className={
               connected
@@ -109,6 +129,7 @@ const ConnectContent = ({
           />
 
           <div className="flex-1 text-left">
+
             <p className="font-bold text-gray-800">
               Cloud Connection
             </p>
@@ -116,6 +137,7 @@ const ConnectContent = ({
             <p className="text-xs text-gray-500">
               No same Wi-Fi required
             </p>
+
           </div>
 
           {connecting ? (
@@ -134,16 +156,21 @@ const ConnectContent = ({
               size={22}
             />
           )}
+
         </div>
 
         {/* BLUETOOTH */}
+
         <button
-          onClick={() => {}}
+          type="button"
+          disabled
           className="flex items-center gap-4 w-full border rounded-xl p-4 opacity-50 cursor-not-allowed"
         >
+
           <Bluetooth className="text-gray-400" />
 
           <div className="flex-1 text-left">
+
             <p className="font-bold text-gray-500">
               Bluetooth
             </p>
@@ -151,10 +178,13 @@ const ConnectContent = ({
             <p className="text-xs text-gray-400">
               Not required for Firebase control
             </p>
+
           </div>
+
         </button>
 
         {/* MESSAGE */}
+
         {connectMsg && (
           <div
             className={`p-3 rounded-xl text-sm ${
@@ -168,36 +198,39 @@ const ConnectContent = ({
         )}
 
       </div>
-    </>
+
+    </div>
   );
 };
 
-// ============================================
+// =====================================================
 // APP LAYOUT
-// ============================================
+// =====================================================
 
-export default function AppLayout() {
+export default function AppLayout({
+  onLogout,
+}: AppLayoutProps) {
 
   const location = useLocation();
   const navigate = useNavigate();
 
-  // ============================================
-  // AUTH
-  // ============================================
+  // =====================================================
+  // USER
+  // =====================================================
 
   const [user, setUser] =
     useState<User | null>(null);
 
-  // ============================================
+  // =====================================================
   // NOTIFICATIONS
-  // ============================================
+  // =====================================================
 
   const [notificationCount, setNotificationCount] =
     useState(0);
 
-  // ============================================
+  // =====================================================
   // CONNECTION
-  // ============================================
+  // =====================================================
 
   const [connectOpen, setConnectOpen] =
     useState(false);
@@ -211,9 +244,9 @@ export default function AppLayout() {
   const [connectMsg, setConnectMsg] =
     useState<string | null>(null);
 
-  // ============================================
-  // MOWER STATUS
-  // ============================================
+  // =====================================================
+  // MOWER
+  // =====================================================
 
   const [mowerOnline, setMowerOnline] =
     useState(false);
@@ -221,9 +254,9 @@ export default function AppLayout() {
   const [driveStatus, setDriveStatus] =
     useState("OFF");
 
-  // ============================================
+  // =====================================================
   // AUTH LISTENER
-  // ============================================
+  // =====================================================
 
   useEffect(() => {
 
@@ -241,14 +274,17 @@ export default function AppLayout() {
 
   }, []);
 
-  // ============================================
-  // FIREBASE CLOUD CONNECTION
-  // ============================================
+  // =====================================================
+  // FIREBASE CONNECTION
+  // =====================================================
 
   useEffect(() => {
 
     const connectedRef =
-      ref(realtimeDb, ".info/connected");
+      ref(
+        realtimeDb,
+        ".info/connected"
+      );
 
     const unsubscribe =
       onValue(
@@ -281,9 +317,9 @@ export default function AppLayout() {
 
   }, []);
 
-  // ============================================
-  // MOWER ONLINE LISTENER
-  // ============================================
+  // =====================================================
+  // MOWER ONLINE
+  // =====================================================
 
   useEffect(() => {
 
@@ -312,9 +348,9 @@ export default function AppLayout() {
 
   }, []);
 
-  // ============================================
-  // DRIVE STATUS LISTENER
-  // ============================================
+  // =====================================================
+  // DRIVE STATUS
+  // =====================================================
 
   useEffect(() => {
 
@@ -343,9 +379,9 @@ export default function AppLayout() {
 
   }, []);
 
-  // ============================================
-  // NOTIFICATION
-  // ============================================
+  // =====================================================
+  // CREATE NOTIFICATION
+  // =====================================================
 
   const createNotification = async (
     title: string,
@@ -373,7 +409,8 @@ export default function AppLayout() {
           description,
           type,
           read: false,
-          createdAt: serverTimestamp(),
+          createdAt:
+            serverTimestamp(),
         }
       );
 
@@ -388,13 +425,16 @@ export default function AppLayout() {
 
   };
 
-  // ============================================
+  // =====================================================
   // NOTIFICATION COUNT
-  // ============================================
+  // =====================================================
 
   useEffect(() => {
 
-    if (!user) return;
+    if (!user) {
+      setNotificationCount(0);
+      return;
+    }
 
     const notificationQuery =
       query(
@@ -420,6 +460,14 @@ export default function AppLayout() {
             snapshot.docs.length
           );
 
+        },
+        (error) => {
+
+          console.error(
+            "Notification listener error:",
+            error
+          );
+
         }
       );
 
@@ -427,11 +475,11 @@ export default function AppLayout() {
 
   }, [user]);
 
-  // ============================================
-  // CONNECT BUTTON
-  // ============================================
+  // =====================================================
+  // CONNECT
+  // =====================================================
 
-  const handleConnect = async () => {
+  const handleConnect = () => {
 
     setConnecting(true);
 
@@ -439,121 +487,101 @@ export default function AppLayout() {
       "Checking Firebase connection..."
     );
 
-    try {
-
-      const connectedRef =
-        ref(
-          realtimeDb,
-          ".info/connected"
-        );
-
-      const unsubscribe =
-        onValue(
-          connectedRef,
-          async (snapshot) => {
-
-            const firebaseConnected =
-              snapshot.val() === true;
-
-            if (firebaseConnected) {
-
-              setConnected(true);
-
-              setConnectMsg(
-                mowerOnline
-                  ? "Mower is online."
-                  : "Firebase connected, but mower is offline."
-              );
-
-              await createNotification(
-                "Firebase Connected",
-                "The application successfully connected to Firebase.",
-                "completed"
-              );
-
-            } else {
-
-              setConnected(false);
-
-              setConnectMsg(
-                "No internet connection."
-              );
-
-            }
-
-            setConnecting(false);
-
-            unsubscribe();
-
-          },
-          {
-            onlyOnce: true,
-          }
-        );
-
-    } catch (error) {
-
-      console.error(error);
-
-      setConnected(false);
-
-      setConnectMsg(
-        "Unable to connect to Firebase."
+    const connectedRef =
+      ref(
+        realtimeDb,
+        ".info/connected"
       );
 
-      setConnecting(false);
+    const unsubscribe =
+      onValue(
+        connectedRef,
+        async (snapshot) => {
 
-    }
+          const firebaseConnected =
+            snapshot.val() === true;
+
+          if (firebaseConnected) {
+
+            setConnected(true);
+
+            setConnectMsg(
+              mowerOnline
+                ? "Mower is online."
+                : "Firebase connected, but mower is offline."
+            );
+
+          } else {
+
+            setConnected(false);
+
+            setConnectMsg(
+              "No internet connection."
+            );
+
+          }
+
+          setConnecting(false);
+
+          unsubscribe();
+
+        }
+      );
 
   };
 
-  // ============================================
-  // DISCONNECT UI
-  // ============================================
+  // =====================================================
+  // CLOSE CONNECTION MODAL
+  // =====================================================
 
-  const handleDisconnect = async () => {
-
+  const handleDisconnect = () => {
     setConnectOpen(false);
-
-    await createNotification(
-      "Connection Closed",
-      "Firebase cloud connection window was closed.",
-      "warning"
-    );
-
   };
 
-  // ============================================
+  // =====================================================
   // LOGOUT
-  // ============================================
+  // =====================================================
 
   const handleLogout = async () => {
 
-    if (connected) {
+    try {
 
-      await createNotification(
-        "Session Ended",
-        "User logged out of the mower application.",
-        "system"
+      if (user) {
+
+        await createNotification(
+          "Session Ended",
+          "User logged out of the mower application.",
+          "system"
+        );
+
+      }
+
+      await onLogout();
+
+    } catch (error) {
+
+      console.error(
+        "Logout error:",
+        error
       );
 
     }
 
-    await auth.signOut();
-
-    navigate("/login");
-
   };
 
-  // ============================================
+  // =====================================================
   // ACTIVE ROUTE
-  // ============================================
+  // =====================================================
 
-  const isActive = (path: string) => {
+  const isActive = (
+    path: string
+  ) => {
 
     if (path === ".") {
 
-      return location.pathname === "/app";
+      return (
+        location.pathname === "/app"
+      );
 
     }
 
@@ -563,12 +591,11 @@ export default function AppLayout() {
 
   };
 
-  // ============================================
+  // =====================================================
   // RENDER
-  // ============================================
+  // =====================================================
 
   return (
-
     <div className="relative min-h-screen pb-28 md:pb-0">
 
       {/* BACKGROUND */}
@@ -578,7 +605,8 @@ export default function AppLayout() {
         style={{
           backgroundImage:
             `url(${bgImage})`,
-          transform: "scale(1.05)",
+          transform:
+            "scale(1.05)",
         }}
       />
 
@@ -604,7 +632,7 @@ export default function AppLayout() {
                 <img
                   src={logoImage}
                   className="w-9 h-9 rounded-full object-cover"
-                  alt="logo"
+                  alt="Solar Mower Logo"
                 />
 
               </div>
@@ -615,7 +643,7 @@ export default function AppLayout() {
 
             </Link>
 
-            {/* NAV */}
+            {/* DESKTOP NAV */}
 
             <nav className="hidden md:flex items-center gap-8 font-semibold text-sm">
 
@@ -687,6 +715,7 @@ export default function AppLayout() {
               {/* CONNECT */}
 
               <button
+                type="button"
                 onClick={() => {
                   setConnectOpen(true);
                   handleConnect();
@@ -705,6 +734,7 @@ export default function AppLayout() {
               {/* LOGOUT */}
 
               <button
+                type="button"
                 onClick={handleLogout}
                 className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-700 hover:bg-gray-800 text-white text-sm font-semibold"
               >
@@ -718,6 +748,7 @@ export default function AppLayout() {
               {/* NOTIFICATIONS */}
 
               <button
+                type="button"
                 onClick={() =>
                   navigate(
                     "/app/notifications"
@@ -784,24 +815,21 @@ export default function AppLayout() {
         <div className="bg-white rounded-[2rem] shadow-lg px-8 py-5 flex items-center justify-between">
 
           <Link to="/app">
-
             <Home
               size={26}
               className="text-green-600"
             />
-
           </Link>
 
           <Link to="/app/schedule">
-
             <Calendar
               size={26}
               className="text-green-600"
             />
-
           </Link>
 
           <button
+            type="button"
             onClick={() => {
               setConnectOpen(true);
               handleConnect();
@@ -814,33 +842,28 @@ export default function AppLayout() {
           >
 
             {mowerOnline ? (
-
               <Unplug
                 size={30}
                 className="text-white"
               />
-
             ) : (
-
               <Plus
                 size={34}
                 className="text-green-600"
               />
-
             )}
 
           </button>
 
           <Link to="/app/energy">
-
             <Zap
               size={26}
               className="text-green-600"
             />
-
           </Link>
 
           <button
+            type="button"
             onClick={handleLogout}
             className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center"
           >
@@ -864,11 +887,11 @@ export default function AppLayout() {
 
           <>
 
+            {/* OVERLAY */}
+
             <motion.div
               className="fixed inset-0 bg-black/40 z-40"
-              onClick={() =>
-                setConnectOpen(false)
-              }
+              onClick={handleDisconnect}
               initial={{
                 opacity: 0,
               }}
@@ -879,6 +902,8 @@ export default function AppLayout() {
                 opacity: 0,
               }}
             />
+
+            {/* MODAL */}
 
             <motion.div
               initial={{
@@ -902,12 +927,12 @@ export default function AppLayout() {
                   connecting={connecting}
                   connected={connected}
                   connectMsg={connectMsg}
-                  close={() =>
-                    setConnectOpen(false)
-                  }
+                  close={handleDisconnect}
                 />
 
                 <div className="mt-5 pt-4 border-t">
+
+                  {/* FIREBASE */}
 
                   <div className="flex justify-between text-xs">
 
@@ -929,6 +954,8 @@ export default function AppLayout() {
 
                   </div>
 
+                  {/* MOWER */}
+
                   <div className="flex justify-between text-xs mt-2">
 
                     <span className="text-gray-500">
@@ -948,6 +975,8 @@ export default function AppLayout() {
                     </span>
 
                   </div>
+
+                  {/* DRIVE */}
 
                   <div className="flex justify-between text-xs mt-2">
 
@@ -980,8 +1009,5 @@ export default function AppLayout() {
       </AnimatePresence>
 
     </div>
-
   );
-
 }
-

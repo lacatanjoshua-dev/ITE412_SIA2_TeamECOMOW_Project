@@ -1,17 +1,29 @@
 import { initializeApp } from "firebase/app";
+import { getAnalytics, isSupported } from "firebase/analytics";
+
 import {
   getAuth,
   GoogleAuthProvider,
 } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getDatabase } from "firebase/database";
+
+import {
+  getFirestore,
+} from "firebase/firestore";
+
+import {
+  getDatabase,
+} from "firebase/database";
+
+import {
+  getStorage,
+} from "firebase/storage";
 
 // =====================================================
-// FIREBASE CONFIG
+// FIREBASE CONFIGURATION
 // =====================================================
 
 const firebaseConfig = {
-  apiKey: "AIzaSyD6Yn1fQ2HFzLRzO0d4m38o1_upy-E",
+  apiKey: "AIzaSyD6Yn1fQ2HFzLRGeVRzO0d4m38o1_upy-E",
   authDomain: "mowerapp-3be07.firebaseapp.com",
   databaseURL:
     "https://mowerapp-3be07-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -29,28 +41,43 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // =====================================================
-// FIREBASE AUTHENTICATION
+// FIREBASE SERVICES
 // =====================================================
 
+// Firebase Authentication
 export const auth = getAuth(app);
 
-// Google Sign-In Provider
-export const googleProvider = new GoogleAuthProvider();
+// Google Authentication Provider
+export const googleProvider =
+  new GoogleAuthProvider();
 
-// =====================================================
-// FIRESTORE
-// =====================================================
-
+// Firestore
 export const db = getFirestore(app);
 
+// Realtime Database
+export const realtimeDb =
+  getDatabase(app);
+
+// Firebase Storage
+export const storage =
+  getStorage(app);
+
 // =====================================================
-// REALTIME DATABASE
+// ANALYTICS
 // =====================================================
 
-export const realtimeDb = getDatabase(app);
+// Analytics is optional.
+// This prevents errors in environments where
+// Analytics is not supported.
+isSupported()
+  .then((supported) => {
+    if (supported) {
+      getAnalytics(app);
+    }
+  })
+  .catch(() => {
+    // Analytics unavailable
+  });
 
-// =====================================================
-// DEFAULT EXPORT
-// =====================================================
-
+// Export Firebase app if needed elsewhere
 export default app;
