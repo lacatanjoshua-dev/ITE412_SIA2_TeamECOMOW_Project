@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 import {
   ArrowUp,
@@ -35,7 +35,6 @@ import {
   onValue,
 } from "firebase/database";
 
-
 // =====================================================
 // COMMAND TYPES
 // =====================================================
@@ -45,8 +44,9 @@ type Command =
   | "backward"
   | "stop"
   | "left"
-  | "right";
-
+  | "right"
+  | "ON"
+  | "OFF";
 
 // =====================================================
 // COMPONENT
@@ -60,13 +60,11 @@ export default function ManualControlScreen() {
 
   const [user, setUser] = useState<User | null>(null);
 
-
   // ===================================================
   // CONNECTION
   // ===================================================
 
   const [isConnected, setIsConnected] = useState(false);
-
 
   // ===================================================
   // DRIVE
@@ -74,13 +72,11 @@ export default function ManualControlScreen() {
 
   const [driveActive, setDriveActive] = useState(false);
 
-
   // ===================================================
   // BLADES
   // ===================================================
 
   const [bladesActive, setBladesActive] = useState(false);
-
 
   // ===================================================
   // DIRECTION
@@ -88,7 +84,6 @@ export default function ManualControlScreen() {
 
   const [direction, setDirection] =
     useState<string | null>(null);
-
 
   // ===================================================
   // CAMERA
@@ -100,7 +95,6 @@ export default function ManualControlScreen() {
   const [currentCamera, setCurrentCamera] =
     useState<"front" | "rear">("front");
 
-
   // ===================================================
   // LED
   // ===================================================
@@ -108,26 +102,25 @@ export default function ManualControlScreen() {
   const [ledActive, setLedActive] =
     useState(false);
 
-
   // ===================================================
   // AUTH LISTENER
   // ===================================================
 
   useEffect(() => {
 
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      (currentUser) => {
+    const unsubscribe =
+      onAuthStateChanged(
+        auth,
+        (currentUser) => {
 
-        setUser(currentUser);
+          setUser(currentUser);
 
-      }
-    );
+        }
+      );
 
     return () => unsubscribe();
 
   }, []);
-
 
   // ===================================================
   // FIRESTORE NOTIFICATION
@@ -173,7 +166,6 @@ export default function ManualControlScreen() {
     }
   };
 
-
   // ===================================================
   // REALTIME DRIVE STATUS
   // ===================================================
@@ -190,38 +182,66 @@ export default function ManualControlScreen() {
 
       (snapshot) => {
 
-        const status = snapshot.val();
+        const status =
+          snapshot.val();
 
         console.log(
           "Firebase Drive Status:",
           status
         );
 
+        setIsConnected(true);
 
         // =============================================
         // DRIVE ON
         // =============================================
 
-        if (status === "ON") {
+        if (
+          status === "ON" ||
+          status === "FORWARD" ||
+          status === "BACKWARD"
+        ) {
 
           setDriveActive(true);
 
-          setIsConnected(true);
-
         }
 
-
         // =============================================
-        // DRIVE OFF
+        // DRIVE STOPPED / OFF
         // =============================================
 
-        else if (status === "OFF") {
+        else if (
+          status === "OFF" ||
+          status === "STOPPED"
+        ) {
 
           setDriveActive(false);
 
           setDirection(null);
 
-          setIsConnected(true);
+        }
+
+        // =============================================
+        // STEERING COMMAND
+        // =============================================
+
+        else if (
+          status === "STEERING_LEFT"
+        ) {
+
+          setDriveActive(true);
+
+          setDirection("LEFT");
+
+        }
+
+        else if (
+          status === "STEERING_RIGHT"
+        ) {
+
+          setDriveActive(true);
+
+          setDirection("RIGHT");
 
         }
 
@@ -239,72 +259,12 @@ export default function ManualControlScreen() {
       }
     );
 
-
     return () => unsubscribe();
 
   }, []);
 
-
   // ===================================================
-  // REALTIME BLADE STATUS
-  // ===================================================
-
-  useEffect(() => {
-
-    const bladeStatusRef = ref(
-      realtimeDb,
-      "ecomow/mower/blades/status"
-    );
-
-    const unsubscribe = onValue(
-      bladeStatusRef,
-
-      (snapshot) => {
-
-        const status = snapshot.val();
-
-        console.log(
-          "Firebase Blade Status:",
-          status
-        );
-
-
-        if (status === "ON") {
-
-          setBladesActive(true);
-
-          setIsConnected(true);
-
-        }
-
-        else if (status === "OFF") {
-
-          setBladesActive(false);
-
-          setIsConnected(true);
-
-        }
-
-      },
-
-      (error) => {
-
-        console.error(
-          "Blade realtime listener error:",
-          error
-        );
-
-      }
-    );
-
-
-    return () => unsubscribe();
-
-  }, []);
-
-
-  // ===================================================
-  // SEND MOVEMENT COMMAND
+  // SEND DRIVE COMMAND
   // ===================================================
 
   const sendCommand = async (
@@ -314,44 +274,94 @@ export default function ManualControlScreen() {
 
     try {
 
+      console.log(
+        "Sending drive command:",
+        cmd
+      );
+
       await set(
         ref(
           realtimeDb,
-          "ecomow/mower/movement/command"
+          "ecomow/mower/drive/command"
         ),
         cmd
       );
 
-
       setIsConnected(true);
 
+      // =============================================
+      // LOCAL UI
+      // =============================================
+
+      if (cmd === "ON") {
+
+        setDriveActive(true);
+
+      }
+
+      else if (cmd === "OFF") {
+
+        setDriveActive(false);
+
+        setDirection(null);
+
+      }
+
+      else if (cmd === "stop") {
+
+        setDriveActive(false);
+
+        setDirection(null);
+
+      }
+
+      else if (
+        cmd === "forward" ||
+        cmd === "backward" ||
+        cmd === "left" ||
+        cmd === "right"
+      ) {
+
+        setDriveActive(true);
+
+        setDirection(
+          cmd.toUpperCase()
+        );
+
+      }
+
+      // =============================================
+      // NOTIFICATION
+      // =============================================
 
       if (notify) {
 
-        const commandNames: Record<
-          Command,
-          string
-        > = {
+        const commandNames:
+          Record<Command, string> = {
 
-          forward: "Forward",
+            ON: "Drive ON",
 
-          backward: "Backward",
+            OFF: "Drive OFF",
 
-          stop: "Emergency Stop",
+            forward: "Forward",
 
-          left: "Left Turn",
+            backward: "Backward",
 
-          right: "Right Turn",
+            stop: "Emergency Stop",
 
-        };
+            left: "Left Turn",
 
+            right: "Right Turn",
+
+          };
 
         await createNotification(
           `Manual Command: ${commandNames[cmd]}`,
 
-          `User executed ${commandNames[cmd]} command on the mower.`,
+          `User executed ${commandNames[cmd]} command on the mower drive system.`,
 
-          cmd === "stop"
+          cmd === "stop" ||
+          cmd === "OFF"
             ? "error"
             : "system"
         );
@@ -361,19 +371,18 @@ export default function ManualControlScreen() {
     } catch (error) {
 
       console.error(
-        "Firebase movement command error:",
+        "Firebase drive command error:",
         error
       );
 
       setIsConnected(false);
-
 
       if (notify) {
 
         await createNotification(
           "Command Failed",
 
-          `Failed to send ${cmd} command.`,
+          `Failed to send ${cmd} command to the mower.`,
 
           "error"
         );
@@ -381,9 +390,7 @@ export default function ManualControlScreen() {
       }
 
     }
-
   };
-
 
   // ===================================================
   // DRIVE ON
@@ -391,56 +398,16 @@ export default function ManualControlScreen() {
 
   const engageDrive = async () => {
 
-    try {
+    console.log(
+      "Sending DRIVE ON..."
+    );
 
-      console.log(
-        "Sending DRIVE ON..."
-      );
-
-
-      await set(
-        ref(
-          realtimeDb,
-          "ecomow/mower/drive/command"
-        ),
-        "ON"
-      );
-
-
-      setIsConnected(true);
-
-
-      await createNotification(
-        "Drive Engaged",
-        "Mower drive system has been engaged.",
-        "completed"
-      );
-
-
-      console.log(
-        "DRIVE ON command sent."
-      );
-
-    } catch (error) {
-
-      console.error(
-        "Firebase drive ON error:",
-        error
-      );
-
-      setIsConnected(false);
-
-
-      await createNotification(
-        "Drive Engagement Failed",
-        "Unable to send drive ON command.",
-        "error"
-      );
-
-    }
+    await sendCommand(
+      "ON",
+      true
+    );
 
   };
-
 
   // ===================================================
   // DRIVE OFF
@@ -448,115 +415,41 @@ export default function ManualControlScreen() {
 
   const disengageDrive = async () => {
 
-    try {
+    console.log(
+      "Sending DRIVE OFF..."
+    );
 
-      console.log(
-        "Sending DRIVE OFF..."
-      );
+    // ===============================================
+    // DRIVE OFF
+    // ===============================================
 
+    await sendCommand(
+      "OFF",
+      true
+    );
 
-      await set(
-        ref(
-          realtimeDb,
-          "ecomow/mower/drive/command"
-        ),
-        "OFF"
-      );
-
-
-      // Stop movement too
-      await set(
-        ref(
-          realtimeDb,
-          "ecomow/mower/movement/command"
-        ),
-        "stop"
-      );
-
-
-      setDirection(null);
-
-      setIsConnected(true);
-
-
-      await createNotification(
-        "Drive Disengaged",
-        "Mower drive system has been disengaged.",
-        "warning"
-      );
-
-
-      console.log(
-        "DRIVE OFF command sent."
-      );
-
-    } catch (error) {
-
-      console.error(
-        "Firebase drive OFF error:",
-        error
-      );
-
-      setIsConnected(false);
-
-
-      await createNotification(
-        "Drive Disengagement Failed",
-        "Unable to send drive OFF command.",
-        "error"
-      );
-
-    }
+    setDirection(null);
 
   };
 
-
   // ===================================================
   // BLADE ON
+  // TEMPORARILY DISABLED FOR DRIVE TEST
   // ===================================================
 
   const engageBlades = async () => {
 
-    try {
+    console.log(
+      "Blade control is not active yet."
+    );
 
-      await set(
-        ref(
-          realtimeDb,
-          "ecomow/mower/blades/command"
-        ),
-        "ON"
-      );
-
-
-      setIsConnected(true);
-
-
-      await createNotification(
-        "Blades Engaged",
-        "Mower blades have been engaged manually.",
-        "completed"
-      );
-
-    } catch (error) {
-
-      console.error(
-        "Firebase blade ON error:",
-        error
-      );
-
-      setIsConnected(false);
-
-
-      await createNotification(
-        "Blade Engagement Failed",
-        "Unable to send blade ON command.",
-        "error"
-      );
-
-    }
+    await createNotification(
+      "Blade Control",
+      "Blade control is disabled while testing the drive relay.",
+      "warning"
+    );
 
   };
-
 
   // ===================================================
   // BLADE OFF
@@ -564,46 +457,13 @@ export default function ManualControlScreen() {
 
   const disengageBlades = async () => {
 
-    try {
+    console.log(
+      "Blade control is not active yet."
+    );
 
-      await set(
-        ref(
-          realtimeDb,
-          "ecomow/mower/blades/command"
-        ),
-        "OFF"
-      );
-
-
-      setIsConnected(true);
-
-
-      await createNotification(
-        "Blades Disengaged",
-        "Mower blades have been disengaged manually.",
-        "warning"
-      );
-
-    } catch (error) {
-
-      console.error(
-        "Firebase blade OFF error:",
-        error
-      );
-
-      setIsConnected(false);
-
-
-      await createNotification(
-        "Blade Disengagement Failed",
-        "Unable to send blade OFF command.",
-        "error"
-      );
-
-    }
+    setBladesActive(false);
 
   };
-
 
   // ===================================================
   // EMERGENCY STOP
@@ -614,21 +474,21 @@ export default function ManualControlScreen() {
     try {
 
       console.log(
+        "================================"
+      );
+
+      console.log(
         "EMERGENCY STOP"
       );
 
-
-      // Stop movement
-      await set(
-        ref(
-          realtimeDb,
-          "ecomow/mower/movement/command"
-        ),
-        "stop"
+      console.log(
+        "================================"
       );
 
+      // =============================================
+      // STOP DRIVE RELAY
+      // =============================================
 
-      // Turn drive OFF
       await set(
         ref(
           realtimeDb,
@@ -637,16 +497,9 @@ export default function ManualControlScreen() {
         "OFF"
       );
 
-
-      // Turn blades OFF
-      await set(
-        ref(
-          realtimeDb,
-          "ecomow/mower/blades/command"
-        ),
-        "OFF"
-      );
-
+      // =============================================
+      // LOCAL UI
+      // =============================================
 
       setDriveActive(false);
 
@@ -656,13 +509,17 @@ export default function ManualControlScreen() {
 
       setIsConnected(true);
 
+      // =============================================
+      // NOTIFICATION
+      // =============================================
 
       await createNotification(
         "Emergency Stop",
-        "All mower movement and active systems have been stopped.",
+
+        "Drive relay has been turned OFF.",
+
         "error"
       );
-
 
     } catch (error) {
 
@@ -674,9 +531,7 @@ export default function ManualControlScreen() {
       setIsConnected(false);
 
     }
-
   };
-
 
   // ===================================================
   // CAMERA
@@ -689,9 +544,9 @@ export default function ManualControlScreen() {
         ? "rear"
         : "front";
 
-
-    setCurrentCamera(newCamera);
-
+    setCurrentCamera(
+      newCamera
+    );
 
     createNotification(
       "Camera Switched",
@@ -703,7 +558,6 @@ export default function ManualControlScreen() {
 
   };
 
-
   // ===================================================
   // LED
   // ===================================================
@@ -713,9 +567,9 @@ export default function ManualControlScreen() {
     const newLEDState =
       !ledActive;
 
-
-    setLedActive(newLEDState);
-
+    setLedActive(
+      newLEDState
+    );
 
     createNotification(
       `LED ${newLEDState ? "ON" : "OFF"}`,
@@ -731,21 +585,34 @@ export default function ManualControlScreen() {
 
   };
 
-
   // ===================================================
   // DIRECTION PRESS
   // ===================================================
 
   const handleDirectionPress = (
-    dir: string
+    dir: Command
   ) => {
 
-    if (!driveActive) return;
+    if (!driveActive) {
 
-    setDirection(dir);
+      console.log(
+        "Drive is not engaged."
+      );
+
+      return;
+
+    }
+
+    setDirection(
+      dir.toString().toUpperCase()
+    );
+
+    sendCommand(
+      dir,
+      true
+    );
 
   };
-
 
   // ===================================================
   // DIRECTION RELEASE
@@ -755,13 +622,16 @@ export default function ManualControlScreen() {
 
     setDirection(null);
 
+    // ===============================================
+    // Stop relay when button is released
+    // ===============================================
+
     sendCommand(
       "stop",
       false
     );
 
   };
-
 
   // ===================================================
   // LOADING
@@ -791,7 +661,6 @@ export default function ManualControlScreen() {
 
   }
 
-
   // ===================================================
   // UI
   // ===================================================
@@ -799,7 +668,6 @@ export default function ManualControlScreen() {
   return (
 
     <div className="p-4 sm:p-6 max-w-7xl mx-auto pb-28 lg:pb-10 font-sans">
-
 
       {/* ================================================= */}
       {/* HEADER */}
@@ -809,7 +677,7 @@ export default function ManualControlScreen() {
 
         <div>
 
-          <h1 className="text-2xl sm:text-3xl font-black text-[#2C3627] tracking-wider uppercase drop-shadow-sm flex items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-black text-[#2C3627] tracking-wider uppercase flex items-center gap-3">
 
             Tactical Control
 
@@ -817,12 +685,11 @@ export default function ManualControlScreen() {
 
           <p className="text-[#40513B] font-semibold text-xs sm:text-sm mt-1">
 
-            Direct navigation, live video feed & active telemetry
+            Firebase Drive Relay Control
 
           </p>
 
         </div>
-
 
         {/* CONNECTION STATUS */}
 
@@ -842,7 +709,7 @@ export default function ManualControlScreen() {
 
               <span className="text-xs font-black uppercase tracking-widest">
 
-                Link Secured
+                Firebase Connected
 
               </span>
 
@@ -858,7 +725,7 @@ export default function ManualControlScreen() {
 
               <span className="text-xs font-black uppercase tracking-widest">
 
-                Signal Lost
+                Firebase Offline
 
               </span>
 
@@ -870,14 +737,11 @@ export default function ManualControlScreen() {
 
       </div>
 
-
-
       {/* ================================================= */}
       {/* MAIN GRID */}
       {/* ================================================= */}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-
 
         {/* ================================================= */}
         {/* LEFT COLUMN */}
@@ -885,15 +749,13 @@ export default function ManualControlScreen() {
 
         <div className="lg:col-span-7 space-y-8">
 
-
           {/* ================================================= */}
           {/* CAMERA */}
           {/* ================================================= */}
 
           <div className="bg-white rounded-[2.5rem] p-3 sm:p-4 shadow-xl border border-gray-100">
 
-            <div className="relative bg-[#1A2118] rounded-[2rem] overflow-hidden aspect-video shadow-inner group">
-
+            <div className="relative bg-[#1A2118] rounded-[2rem] overflow-hidden aspect-video shadow-inner">
 
               {cameraActive ? (
 
@@ -942,9 +804,6 @@ export default function ManualControlScreen() {
 
                   </svg>
 
-
-                  {/* LIVE BADGE */}
-
                   <div className="absolute top-4 left-4 flex items-center gap-2 bg-emerald-950/80 backdrop-blur-md border border-emerald-500/30 px-3 py-1.5 rounded-xl shadow-lg">
 
                     <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
@@ -975,8 +834,7 @@ export default function ManualControlScreen() {
 
               )}
 
-
-              {/* ACTIVE VECTOR */}
+              {/* ACTIVE COMMAND */}
 
               {direction && (
 
@@ -987,7 +845,6 @@ export default function ManualControlScreen() {
                 </div>
 
               )}
-
 
               {/* CAMERA CONTROLS */}
 
@@ -1000,14 +857,13 @@ export default function ManualControlScreen() {
 
                   <RotateCw className="w-3.5 h-3.5 text-emerald-400" />
 
-                  <span className="capitalize">
+                  <span>
 
                     {currentCamera} Cam
 
                   </span>
 
                 </button>
-
 
                 <button
                   onClick={toggleLED}
@@ -1040,10 +896,8 @@ export default function ManualControlScreen() {
 
           </div>
 
-
-
           {/* ================================================= */}
-          {/* JOYSTICK */}
+          {/* DRIVE COMMAND PAD */}
           {/* ================================================= */}
 
           <div className="bg-white rounded-[2.5rem] p-6 sm:p-8 shadow-xl border border-gray-100 flex flex-col items-center select-none">
@@ -1052,10 +906,9 @@ export default function ManualControlScreen() {
 
               <h2 className="font-black text-[#2C3627] text-xs uppercase tracking-[3px]">
 
-                Thrust Vectoring
+                Drive Command
 
               </h2>
-
 
               {!driveActive && (
 
@@ -1069,40 +922,22 @@ export default function ManualControlScreen() {
 
             </div>
 
-
             <div className="relative w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center">
 
-              {/* OUTER RING */}
-
               <div className="absolute inset-0 rounded-full bg-slate-50 border-4 border-slate-100 shadow-inner" />
-
 
               {/* FORWARD */}
 
               <button
                 disabled={!driveActive}
-                onMouseDown={() => {
-
-                  handleDirectionPress("FORWARD");
-
-                  sendCommand(
-                    "forward",
-                    true
-                  );
-
-                }}
+                onMouseDown={() =>
+                  handleDirectionPress("forward")
+                }
                 onMouseUp={handleDirectionRelease}
                 onMouseLeave={handleDirectionRelease}
-                onTouchStart={() => {
-
-                  handleDirectionPress("FORWARD");
-
-                  sendCommand(
-                    "forward",
-                    true
-                  );
-
-                }}
+                onTouchStart={() =>
+                  handleDirectionPress("forward")
+                }
                 onTouchEnd={handleDirectionRelease}
                 className="absolute top-2 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white shadow-md hover:shadow-lg active:scale-95 border border-slate-100 flex items-center justify-center text-[#2C3627] disabled:opacity-30 disabled:cursor-not-allowed transition"
               >
@@ -1111,33 +946,18 @@ export default function ManualControlScreen() {
 
               </button>
 
-
               {/* RIGHT */}
 
               <button
                 disabled={!driveActive}
-                onMouseDown={() => {
-
-                  handleDirectionPress("RIGHT");
-
-                  sendCommand(
-                    "right",
-                    true
-                  );
-
-                }}
+                onMouseDown={() =>
+                  handleDirectionPress("right")
+                }
                 onMouseUp={handleDirectionRelease}
                 onMouseLeave={handleDirectionRelease}
-                onTouchStart={() => {
-
-                  handleDirectionPress("RIGHT");
-
-                  sendCommand(
-                    "right",
-                    true
-                  );
-
-                }}
+                onTouchStart={() =>
+                  handleDirectionPress("right")
+                }
                 onTouchEnd={handleDirectionRelease}
                 className="absolute right-2 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white shadow-md hover:shadow-lg active:scale-95 border border-slate-100 flex items-center justify-center text-[#2C3627] disabled:opacity-30 disabled:cursor-not-allowed transition"
               >
@@ -1146,33 +966,18 @@ export default function ManualControlScreen() {
 
               </button>
 
-
               {/* BACKWARD */}
 
               <button
                 disabled={!driveActive}
-                onMouseDown={() => {
-
-                  handleDirectionPress("BACKWARD");
-
-                  sendCommand(
-                    "backward",
-                    true
-                  );
-
-                }}
+                onMouseDown={() =>
+                  handleDirectionPress("backward")
+                }
                 onMouseUp={handleDirectionRelease}
                 onMouseLeave={handleDirectionRelease}
-                onTouchStart={() => {
-
-                  handleDirectionPress("BACKWARD");
-
-                  sendCommand(
-                    "backward",
-                    true
-                  );
-
-                }}
+                onTouchStart={() =>
+                  handleDirectionPress("backward")
+                }
                 onTouchEnd={handleDirectionRelease}
                 className="absolute bottom-2 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white shadow-md hover:shadow-lg active:scale-95 border border-slate-100 flex items-center justify-center text-[#2C3627] disabled:opacity-30 disabled:cursor-not-allowed transition"
               >
@@ -1181,33 +986,18 @@ export default function ManualControlScreen() {
 
               </button>
 
-
               {/* LEFT */}
 
               <button
                 disabled={!driveActive}
-                onMouseDown={() => {
-
-                  handleDirectionPress("LEFT");
-
-                  sendCommand(
-                    "left",
-                    true
-                  );
-
-                }}
+                onMouseDown={() =>
+                  handleDirectionPress("left")
+                }
                 onMouseUp={handleDirectionRelease}
                 onMouseLeave={handleDirectionRelease}
-                onTouchStart={() => {
-
-                  handleDirectionPress("LEFT");
-
-                  sendCommand(
-                    "left",
-                    true
-                  );
-
-                }}
+                onTouchStart={() =>
+                  handleDirectionPress("left")
+                }
                 onTouchEnd={handleDirectionRelease}
                 className="absolute left-2 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white shadow-md hover:shadow-lg active:scale-95 border border-slate-100 flex items-center justify-center text-[#2C3627] disabled:opacity-30 disabled:cursor-not-allowed transition"
               >
@@ -1216,29 +1006,37 @@ export default function ManualControlScreen() {
 
               </button>
 
-
               {/* CENTER */}
 
               <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-100 border border-slate-200 shadow-inner flex items-center justify-center">
 
-                <div className="w-6 h-6 rounded-full bg-slate-300" />
+                <div
+                  className={`w-6 h-6 rounded-full ${
+                    driveActive
+                      ? "bg-emerald-500 animate-pulse"
+                      : "bg-slate-300"
+                  }`}
+                />
 
               </div>
 
             </div>
 
+            <p className="mt-5 text-[10px] text-slate-400 font-semibold text-center">
+
+              Commands are sent through Firebase Realtime Database.
+
+            </p>
+
           </div>
 
         </div>
-
-
 
         {/* ================================================= */}
         {/* RIGHT COLUMN */}
         {/* ================================================= */}
 
         <div className="lg:col-span-5 space-y-6">
-
 
           {/* ================================================= */}
           {/* EMERGENCY STOP */}
@@ -1260,28 +1058,26 @@ export default function ManualControlScreen() {
 
               </div>
 
-
               <p className="text-[11px] text-slate-500 font-medium mt-1">
 
-                Immediately stop all mower movement and active systems.
+                Immediately turn OFF the drive relay.
 
               </p>
 
             </div>
 
-
             <button
               type="button"
               onClick={stopMower}
-              className="w-full !bg-rose-600 hover:!bg-rose-700 active:!bg-rose-800 active:scale-[0.98] !text-white py-6 rounded-[2rem] font-black text-lg tracking-wider flex items-center justify-center gap-3 transition-all duration-200 shadow-lg !shadow-rose-600/30 !border !border-rose-500"
+              className="w-full bg-rose-600 hover:bg-rose-700 active:bg-rose-800 active:scale-[0.98] text-white py-6 rounded-[2rem] font-black text-lg tracking-wider flex items-center justify-center gap-3 transition-all duration-200 shadow-lg shadow-rose-600/30 border border-rose-500"
             >
 
               <StopCircle
-                className="w-8 h-8 !text-white"
+                className="w-8 h-8 text-white"
                 strokeWidth={2.5}
               />
 
-              <span className="!text-white">
+              <span>
 
                 EMERGENCY STOP
 
@@ -1289,22 +1085,19 @@ export default function ManualControlScreen() {
 
             </button>
 
-
             <div className="mt-3 flex items-center justify-center gap-2">
 
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
 
               <span className="text-[9px] font-black uppercase tracking-[2px] text-red-500">
 
-                Press to stop mower
+                Press to stop relay
 
               </span>
 
             </div>
 
           </div>
-
-
 
           {/* ================================================= */}
           {/* DRIVE CONTROL */}
@@ -1316,10 +1109,9 @@ export default function ManualControlScreen() {
 
               <h3 className="font-black text-[#2C3627] text-xs uppercase tracking-widest">
 
-                Drive System
+                Drive Relay
 
               </h3>
-
 
               <span
                 className={`text-xs font-black uppercase px-3 py-1 rounded-full border ${
@@ -1336,7 +1128,6 @@ export default function ManualControlScreen() {
               </span>
 
             </div>
-
 
             <div className="space-y-3">
 
@@ -1358,7 +1149,6 @@ export default function ManualControlScreen() {
 
               </button>
 
-
               {/* DRIVE OFF */}
 
               <button
@@ -1379,15 +1169,31 @@ export default function ManualControlScreen() {
 
             </div>
 
+            {/* FIREBASE PATH */}
+
+            <div className="mt-5 p-3 bg-slate-50 rounded-xl border border-slate-100">
+
+              <p className="text-[9px] uppercase tracking-widest font-black text-slate-400">
+
+                Firebase Command Path
+
+              </p>
+
+              <p className="text-[10px] font-mono text-slate-600 mt-1 break-all">
+
+                /ecomow/mower/drive/command
+
+              </p>
+
+            </div>
+
           </div>
 
-
-
           {/* ================================================= */}
-          {/* BLADE CONTROL */}
+          {/* BLADE CONTROL - TEMPORARILY DISABLED */}
           {/* ================================================= */}
 
-          <div className="bg-white rounded-[2.5rem] p-6 sm:p-8 shadow-xl border border-gray-100">
+          <div className="bg-white rounded-[2.5rem] p-6 sm:p-8 shadow-xl border border-gray-100 opacity-60">
 
             <div className="flex items-center justify-between mb-5">
 
@@ -1397,65 +1203,41 @@ export default function ManualControlScreen() {
 
               </h3>
 
+              <span className="text-xs font-black uppercase px-3 py-1 rounded-full border bg-slate-100 text-slate-500 border-slate-200">
 
-              <span
-                className={`text-xs font-black uppercase px-3 py-1 rounded-full border ${
-                  bladesActive
-                    ? "bg-emerald-50 text-emerald-600 border-emerald-200"
-                    : "bg-slate-100 text-slate-500 border-slate-200"
-                }`}
-              >
-
-                {bladesActive
-                  ? "Engaged"
-                  : "Disengaged"}
+                Testing Later
 
               </span>
 
             </div>
 
-
             <div className="space-y-3">
-
-
-              {/* BLADE ON */}
 
               <button
                 onClick={engageBlades}
-                disabled={bladesActive}
-                className={`w-full py-4 rounded-2xl font-bold text-sm tracking-wider flex items-center justify-center gap-3 transition ${
-                  bladesActive
-                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                    : "bg-[#40513B] hover:bg-[#2C3627] text-white shadow-md active:scale-[0.98]"
-                }`}
+                className="w-full py-4 rounded-2xl font-bold text-sm tracking-wider bg-slate-100 text-slate-400"
               >
-
-                <Power className="w-4 h-4" />
 
                 ENGAGE BLADES
 
               </button>
 
-
-              {/* BLADE OFF */}
-
               <button
                 onClick={disengageBlades}
-                disabled={!bladesActive}
-                className={`w-full py-4 rounded-2xl font-bold text-sm tracking-wider flex items-center justify-center gap-3 border transition ${
-                  !bladesActive
-                    ? "border-slate-100 text-slate-300 cursor-not-allowed"
-                    : "border-slate-200 text-slate-700 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 active:scale-[0.98]"
-                }`}
+                className="w-full py-4 rounded-2xl font-bold text-sm tracking-wider border border-slate-100 text-slate-400"
               >
-
-                <CircleStop className="w-4 h-4" />
 
                 DISENGAGE BLADES
 
               </button>
 
             </div>
+
+            <p className="text-[10px] text-slate-400 mt-4 text-center">
+
+              Blade control will be connected after drive relay testing.
+
+            </p>
 
           </div>
 
@@ -1464,7 +1246,6 @@ export default function ManualControlScreen() {
       </div>
 
     </div>
-
   );
-
 }
+
