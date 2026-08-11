@@ -35,7 +35,7 @@ import SignupScreen from "./components/SignupScreen";
 
 import AppLayout from "./components/AppLayout";
 
-import Dashboard from "./components/AutomaticControl.tsx";
+import AutomaticControl from "./components/AutomaticControl";
 import ManualControlScreen from "./components/ManualControlScreen";
 import AccountSettingsScreen from "./components/AccountSettingsScreen";
 import ScheduleScreen from "./components/ScheduleScreen";
@@ -66,9 +66,11 @@ export default function App() {
 
   const [user, setUser] = useState<User | null>(null);
 
-  const [role, setRole] = useState<UserRole>(null);
+  const [role, setRole] =
+    useState<UserRole>(null);
 
-  const [checking, setChecking] = useState(true);
+  const [checking, setChecking] =
+    useState(true);
 
   // ===================================================
   // LOAD USER ROLE FROM FIRESTORE
@@ -76,7 +78,7 @@ export default function App() {
 
   const loadUserRole = async (
     currentUser: User
-  ): Promise<UserRole> => {
+  ): Promise<"user" | "admin"> => {
     try {
       const userRef = doc(
         db,
@@ -84,27 +86,29 @@ export default function App() {
         currentUser.uid
       );
 
-      const userSnapshot = await getDoc(
-        userRef
-      );
+      const userSnapshot =
+        await getDoc(userRef);
 
       // =============================================
       // USER DOCUMENT EXISTS
       // =============================================
 
       if (userSnapshot.exists()) {
-        const userData = userSnapshot.data();
+        const userData =
+          userSnapshot.data();
 
         console.log(
           "Firestore user data:",
           userData
         );
 
-        // ---------------------------------------------
+        // =========================================
         // ADMIN
-        // ---------------------------------------------
+        // =========================================
 
-        if (userData.role === "admin") {
+        if (
+          userData.role === "admin"
+        ) {
           console.log(
             "ADMIN ACCOUNT DETECTED"
           );
@@ -112,9 +116,9 @@ export default function App() {
           return "admin";
         }
 
-        // ---------------------------------------------
+        // =========================================
         // NORMAL USER
-        // ---------------------------------------------
+        // =========================================
 
         return "user";
       }
@@ -127,9 +131,9 @@ export default function App() {
         "No Firestore user document found."
       );
 
-      // Create default user document.
-      // IMPORTANT:
-      // New users are NOT admins by default.
+      // =============================================
+      // CREATE DEFAULT USER DOCUMENT
+      // =============================================
 
       try {
         await setDoc(
@@ -273,10 +277,8 @@ export default function App() {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8FAF7] px-4">
-
+      <div className="min-h-screen flex items-center justify-center bg-[#F7F5EA] p-6">
         <div className="text-center bg-white rounded-3xl p-8 shadow-lg border border-[#E5D9B6]/50">
-
           <div className="w-12 h-12 border-4 border-[#628141]/20 border-t-[#628141] rounded-full animate-spin mx-auto mb-5" />
 
           <p className="text-sm font-black text-[#40513B]">
@@ -286,9 +288,7 @@ export default function App() {
           <p className="text-xs text-[#6D7C66] font-medium mt-1">
             Checking your account
           </p>
-
         </div>
-
       </div>
     );
   }
@@ -299,7 +299,6 @@ export default function App() {
 
   return (
     <Router>
-
       <Routes>
 
         {/* =================================================
@@ -375,7 +374,7 @@ export default function App() {
               <SignupScreen
                 onLogin={() => {
                   // Firebase Auth listener
-                  // automatically detects signup/login.
+                  // automatically detects signup.
                 }}
               />
             )
@@ -407,16 +406,32 @@ export default function App() {
           }
         >
 
-          {/* USER DASHBOARD */}
+          {/* =================================================
+              AUTOMATIC CONTROL
+              
+              /app
+              /app/automatic-control
+          ================================================= */}
 
           <Route
             index
             element={
-              <Dashboard />
+              <AutomaticControl />
             }
           />
 
-          {/* SCHEDULE */}
+          <Route
+            path="automatic-control"
+            element={
+              <AutomaticControl />
+            }
+          />
+
+          {/* =================================================
+              SCHEDULE
+              
+              /app/schedule
+          ================================================= */}
 
           <Route
             path="schedule"
@@ -425,7 +440,11 @@ export default function App() {
             }
           />
 
-          {/* ENERGY */}
+          {/* =================================================
+              ENERGY
+              
+              /app/energy
+          ================================================= */}
 
           <Route
             path="energy"
@@ -434,7 +453,11 @@ export default function App() {
             }
           />
 
-          {/* NOTIFICATIONS */}
+          {/* =================================================
+              NOTIFICATIONS
+              
+              /app/notifications
+          ================================================= */}
 
           <Route
             path="notifications"
@@ -443,7 +466,11 @@ export default function App() {
             }
           />
 
-          {/* DEVICES */}
+          {/* =================================================
+              DEVICES
+              
+              /app/devices
+          ================================================= */}
 
           <Route
             path="devices"
@@ -452,7 +479,11 @@ export default function App() {
             }
           />
 
-          {/* MANUAL CONTROL */}
+          {/* =================================================
+              MANUAL CONTROL
+              
+              /app/manual-control
+          ================================================= */}
 
           <Route
             path="manual-control"
@@ -461,7 +492,11 @@ export default function App() {
             }
           />
 
-          {/* ACCOUNT */}
+          {/* =================================================
+              ACCOUNT
+              
+              /app/account
+          ================================================= */}
 
           <Route
             path="account"
@@ -516,8 +551,6 @@ export default function App() {
         />
 
       </Routes>
-
     </Router>
   );
 }
-

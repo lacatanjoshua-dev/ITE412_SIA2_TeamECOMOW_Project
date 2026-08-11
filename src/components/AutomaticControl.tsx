@@ -1,18 +1,19 @@
-// src/pages/AutomaticControl.tsx
-
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import {
   Play,
   Square,
   Power,
-  CircleStop,
   Scissors,
-  ShieldAlert,
+  RefreshCw,
   Wifi,
   WifiOff,
-  RotateCw,
-  AlertTriangle,
+  ArrowRight,
+  Hand,
+  ShieldAlert,
   CheckCircle2,
+  Circle,
 } from "lucide-react";
 
 import { realtimeDb } from "../firebase";
@@ -24,22 +25,32 @@ import {
 } from "firebase/database";
 
 // =====================================================
-// TYPES
+// PROPS
 // =====================================================
 
-type RelayState = "ON" | "OFF";
-type AutomaticState = "RUNNING" | "STOPPED" | "IDLE" | "ERROR";
+interface AutomaticControlProps {
+  onNavigate?: (screen: "manual" | "automatic") => void;
+}
 
 // =====================================================
 // COMPONENT
 // =====================================================
 
-export default function AutomaticControl() {
+export default function AutomaticControl({
+  onNavigate,
+}: AutomaticControlProps) {
+
   // ===================================================
-  // CONNECTION
+  // REACT ROUTER
   // ===================================================
 
-  const [firebaseConnected, setFirebaseConnected] =
+  const navigate = useNavigate();
+
+  // ===================================================
+  // FIREBASE CONNECTION
+  // ===================================================
+
+  const [firebaseOnline, setFirebaseOnline] =
     useState(false);
 
   // ===================================================
@@ -47,336 +58,183 @@ export default function AutomaticControl() {
   // ===================================================
 
   const [driveStatus, setDriveStatus] =
-    useState<RelayState>("OFF");
-
-  const [driveLoading, setDriveLoading] =
-    useState(false);
+    useState<"ON" | "OFF">("OFF");
 
   // ===================================================
-  // MOWING / BLADES
+  // BLADES
   // ===================================================
 
   const [mowingStatus, setMowingStatus] =
-    useState<RelayState>("OFF");
-
-  const [mowingLoading, setMowingLoading] =
-    useState(false);
-
-  // ===================================================
-  // AUTOMATIC
-  // ===================================================
-
-  const [automaticStatus, setAutomaticStatus] =
-    useState<AutomaticState>("IDLE");
-
-  const [automaticLoading, setAutomaticLoading] =
-    useState(false);
+    useState<"ON" | "OFF">("OFF");
 
   // ===================================================
   // MOVEMENT
   // ===================================================
 
-  const [movementCommand, setMovementCommand] =
-    useState("stop");
+  const [movementStatus, setMovementStatus] =
+    useState("STOP");
 
   // ===================================================
-  // MESSAGE
+  // AUTOMATIC STATUS
   // ===================================================
 
-  const [message, setMessage] =
-    useState("");
-
-  const [messageType, setMessageType] =
-    useState<"success" | "error" | "warning">(
-      "success"
-    );
+  const [automaticStatus, setAutomaticStatus] =
+    useState("STOPPED");
 
   // ===================================================
-  // FIREBASE PATHS
+  // LOADING
   // ===================================================
 
-  const driveCommandRef = ref(
-    realtimeDb,
-    "ecomow/mower/drive/command"
-  );
-
-  const driveStatusRef = ref(
-    realtimeDb,
-    "ecomow/mower/drive/status"
-  );
-
-  const bladesCommandRef = ref(
-    realtimeDb,
-    "ecomow/mower/blades/command"
-  );
-
-  const bladesStatusRef = ref(
-    realtimeDb,
-    "ecomow/mower/blades/status"
-  );
-
-  const movementCommandRef = ref(
-    realtimeDb,
-    "ecomow/mower/movement/command"
-  );
-
-  const automaticCommandRef = ref(
-    realtimeDb,
-    "ecomow/mower/automatic/command"
-  );
-
-  const automaticStatusRef = ref(
-    realtimeDb,
-    "ecomow/mower/automatic/status"
-  );
-
-  // ===================================================
-  // MESSAGE HELPER
-  // ===================================================
-
-  const showMessage = (
-    text: string,
-    type: "success" | "error" | "warning" = "success"
-  ) => {
-    setMessage(text);
-    setMessageType(type);
-
-    setTimeout(() => {
-      setMessage("");
-    }, 3000);
-  };
+  const [loading, setLoading] =
+    useState(false);
 
   // ===================================================
   // FIREBASE LISTENERS
   // ===================================================
 
   useEffect(() => {
-    const unsubDrive = onValue(
+
+    // -----------------------------------------------
+    // DRIVE STATUS
+    // -----------------------------------------------
+
+    const driveStatusRef = ref(
+      realtimeDb,
+      "ecomow/mower/drive/status"
+    );
+
+    const unsubscribeDrive = onValue(
       driveStatusRef,
       (snapshot) => {
+
         const value = snapshot.val();
 
-        if (value === "ON" || value === "OFF") {
-          setDriveStatus(value);
-          setFirebaseConnected(true);
+        setFirebaseOnline(true);
+
+        if (value === "ON") {
+          setDriveStatus("ON");
+        } else {
+          setDriveStatus("OFF");
         }
       },
       () => {
-        setFirebaseConnected(false);
+        setFirebaseOnline(false);
       }
     );
 
-    const unsubBlades = onValue(
-      bladesStatusRef,
+    // -----------------------------------------------
+    // MOWING STATUS
+    // -----------------------------------------------
+
+    const mowingStatusRef = ref(
+      realtimeDb,
+      "ecomow/mower/blades/status"
+    );
+
+    const unsubscribeMowing = onValue(
+      mowingStatusRef,
       (snapshot) => {
+
         const value = snapshot.val();
 
-        if (value === "ON" || value === "OFF") {
-          setMowingStatus(value);
-          setFirebaseConnected(true);
+        if (value === "ON") {
+          setMowingStatus("ON");
+        } else {
+          setMowingStatus("OFF");
         }
-      },
-      () => {
-        setFirebaseConnected(false);
       }
     );
 
-    const unsubAutomatic = onValue(
+    // -----------------------------------------------
+    // MOVEMENT STATUS
+    // -----------------------------------------------
+
+    const movementStatusRef = ref(
+      realtimeDb,
+      "ecomow/mower/movement/command"
+    );
+
+    const unsubscribeMovement = onValue(
+      movementStatusRef,
+      (snapshot) => {
+
+        const value = snapshot.val();
+
+        if (value) {
+          setMovementStatus(
+            String(value).toUpperCase()
+          );
+        }
+      }
+    );
+
+    // -----------------------------------------------
+    // AUTOMATIC STATUS
+    // -----------------------------------------------
+
+    const automaticStatusRef = ref(
+      realtimeDb,
+      "ecomow/mower/automatic/status"
+    );
+
+    const unsubscribeAutomatic = onValue(
       automaticStatusRef,
       (snapshot) => {
+
         const value = snapshot.val();
 
-        if (
-          value === "RUNNING" ||
-          value === "STOPPED" ||
-          value === "IDLE" ||
-          value === "ERROR"
-        ) {
-          setAutomaticStatus(value);
-        }
-
-        setFirebaseConnected(true);
-      },
-      () => {
-        setFirebaseConnected(false);
-      }
-    );
-
-    const unsubMovement = onValue(
-      movementCommandRef,
-      (snapshot) => {
-        const value = snapshot.val();
-
-        if (typeof value === "string") {
-          setMovementCommand(value);
+        if (value) {
+          setAutomaticStatus(
+            String(value).toUpperCase()
+          );
         }
       }
     );
+
+    // -----------------------------------------------
+    // CLEANUP
+    // -----------------------------------------------
 
     return () => {
-      unsubDrive();
-      unsubBlades();
-      unsubAutomatic();
-      unsubMovement();
+
+      unsubscribeDrive();
+      unsubscribeMowing();
+      unsubscribeMovement();
+      unsubscribeAutomatic();
+
     };
+
   }, []);
 
   // ===================================================
-  // INITIAL FIREBASE STATUS
+  // FIREBASE COMMAND HELPER
   // ===================================================
 
-  useEffect(() => {
-    set(
-      ref(
-        realtimeDb,
-        "ecomow/mower/connection/status"
-      ),
-      "ONLINE"
-    ).catch((error) => {
+  const sendFirebaseCommand = async (
+    path: string,
+    command: string
+  ) => {
+
+    try {
+
+      await set(
+        ref(realtimeDb, path),
+        command
+      );
+
+      setFirebaseOnline(true);
+
+    } catch (error) {
+
       console.error(
-        "Connection status error:",
+        "Firebase command error:",
         error
       );
-    });
-  }, []);
 
-  // ===================================================
-  // DRIVE ON
-  // ===================================================
+      setFirebaseOnline(false);
 
-  const turnDriveOn = async () => {
-    if (automaticStatus === "RUNNING") {
-      showMessage(
-        "Stop automatic mowing first.",
-        "warning"
-      );
-      return;
     }
 
-    setDriveLoading(true);
-
-    try {
-      await set(
-        driveCommandRef,
-        "ON"
-      );
-
-      showMessage(
-        "Drive ON command sent.",
-        "success"
-      );
-    } catch (error) {
-      console.error(error);
-
-      showMessage(
-        "Failed to send Drive ON command.",
-        "error"
-      );
-    } finally {
-      setDriveLoading(false);
-    }
-  };
-
-  // ===================================================
-  // DRIVE OFF
-  // ===================================================
-
-  const turnDriveOff = async () => {
-    setDriveLoading(true);
-
-    try {
-      await set(
-        driveCommandRef,
-        "OFF"
-      );
-
-      await set(
-        movementCommandRef,
-        "stop"
-      );
-
-      setMovementCommand("stop");
-
-      showMessage(
-        "Drive OFF command sent.",
-        "success"
-      );
-    } catch (error) {
-      console.error(error);
-
-      showMessage(
-        "Failed to send Drive OFF command.",
-        "error"
-      );
-    } finally {
-      setDriveLoading(false);
-    }
-  };
-
-  // ===================================================
-  // MOWING ON
-  // ===================================================
-
-  const turnMowingOn = async () => {
-    if (automaticStatus === "RUNNING") {
-      showMessage(
-        "Mowing is already controlled by automatic mode.",
-        "warning"
-      );
-      return;
-    }
-
-    setMowingLoading(true);
-
-    try {
-      await set(
-        bladesCommandRef,
-        "ON"
-      );
-
-      showMessage(
-        "Mowing relay ON command sent.",
-        "success"
-      );
-    } catch (error) {
-      console.error(error);
-
-      showMessage(
-        "Failed to send Mowing ON command.",
-        "error"
-      );
-    } finally {
-      setMowingLoading(false);
-    }
-  };
-
-  // ===================================================
-  // MOWING OFF
-  // ===================================================
-
-  const turnMowingOff = async () => {
-    setMowingLoading(true);
-
-    try {
-      await set(
-        bladesCommandRef,
-        "OFF"
-      );
-
-      showMessage(
-        "Mowing relay OFF command sent.",
-        "success"
-      );
-    } catch (error) {
-      console.error(error);
-
-      showMessage(
-        "Failed to send Mowing OFF command.",
-        "error"
-      );
-    } finally {
-      setMowingLoading(false);
-    }
   };
 
   // ===================================================
@@ -384,76 +242,68 @@ export default function AutomaticControl() {
   // ===================================================
 
   const startAutomaticMowing = async () => {
-    if (!firebaseConnected) {
-      showMessage(
-        "Firebase is not connected.",
-        "error"
-      );
-      return;
-    }
 
-    if (driveStatus !== "ON") {
-      showMessage(
-        "Turn DRIVE ON before starting automatic mowing.",
-        "warning"
-      );
-      return;
-    }
-
-    if (mowingStatus !== "ON") {
-      showMessage(
-        "Turn MOWING ON before starting automatic mowing.",
-        "warning"
-      );
-      return;
-    }
-
-    setAutomaticLoading(true);
+    if (loading) return;
 
     try {
-      // Set automatic command
-      await set(
-        automaticCommandRef,
+
+      setLoading(true);
+
+      console.log(
+        "START AUTOMATIC MOWING"
+      );
+
+      // ---------------------------------------------
+      // AUTOMATIC COMMAND
+      // ---------------------------------------------
+
+      await sendFirebaseCommand(
+        "ecomow/mower/automatic/command",
         "START"
       );
 
-      // Set initial automatic status
-      await set(
-        automaticStatusRef,
-        "RUNNING"
+      // ---------------------------------------------
+      // DRIVE ON
+      // ---------------------------------------------
+
+      await sendFirebaseCommand(
+        "ecomow/mower/drive/command",
+        "ON"
       );
 
-      // Make sure movement starts from stop
-      await set(
-        movementCommandRef,
+      // ---------------------------------------------
+      // BLADES ON
+      // ---------------------------------------------
+
+      await sendFirebaseCommand(
+        "ecomow/mower/blades/command",
+        "ON"
+      );
+
+      // ---------------------------------------------
+      // MOVEMENT
+      // ---------------------------------------------
+
+      await sendFirebaseCommand(
+        "ecomow/mower/movement/command",
         "forward"
       );
 
-      setMovementCommand("forward");
       setAutomaticStatus("RUNNING");
 
-      showMessage(
-        "Automatic mowing STARTED.",
-        "success"
-      );
     } catch (error) {
+
       console.error(
         "Start automatic mowing error:",
         error
       );
 
-      await set(
-        automaticStatusRef,
-        "ERROR"
-      ).catch(() => {});
-
-      showMessage(
-        "Failed to start automatic mowing.",
-        "error"
-      );
     } finally {
-      setAutomaticLoading(false);
+
+      setLoading(false);
+
     }
+
   };
 
   // ===================================================
@@ -461,137 +311,148 @@ export default function AutomaticControl() {
   // ===================================================
 
   const stopAutomaticMowing = async () => {
-    setAutomaticLoading(true);
+
+    if (loading) return;
 
     try {
-      // =================================================
-      // STOP AUTOMATIC MODE
-      // =================================================
 
-      await set(
-        automaticCommandRef,
+      setLoading(true);
+
+      console.log(
+        "STOP AUTOMATIC MOWING"
+      );
+
+      // ---------------------------------------------
+      // AUTOMATIC STOP
+      // ---------------------------------------------
+
+      await sendFirebaseCommand(
+        "ecomow/mower/automatic/command",
         "STOP"
       );
 
-      // =================================================
-      // STOP MOVEMENT
-      // =================================================
+      // ---------------------------------------------
+      // DRIVE OFF
+      // ---------------------------------------------
 
-      await set(
-        movementCommandRef,
+      await sendFirebaseCommand(
+        "ecomow/mower/drive/command",
+        "OFF"
+      );
+
+      // ---------------------------------------------
+      // BLADES OFF
+      // ---------------------------------------------
+
+      await sendFirebaseCommand(
+        "ecomow/mower/blades/command",
+        "OFF"
+      );
+
+      // ---------------------------------------------
+      // MOVEMENT STOP
+      // ---------------------------------------------
+
+      await sendFirebaseCommand(
+        "ecomow/mower/movement/command",
         "stop"
       );
 
-      // =================================================
-      // TURN DRIVE OFF
-      // =================================================
-
-      await set(
-        driveCommandRef,
-        "OFF"
-      );
-
-      // =================================================
-      // TURN MOWING OFF
-      // =================================================
-
-      await set(
-        bladesCommandRef,
-        "OFF"
-      );
-
-      // =================================================
-      // UPDATE AUTOMATIC STATUS
-      // =================================================
-
-      await set(
-        automaticStatusRef,
-        "STOPPED"
-      );
-
+      setAutomaticStatus("STOPPED");
       setDriveStatus("OFF");
       setMowingStatus("OFF");
-      setMovementCommand("stop");
-      setAutomaticStatus("STOPPED");
+      setMovementStatus("STOP");
 
-      showMessage(
-        "AUTOMATIC MOWING STOPPED. Drive and mowing relay OFF.",
-        "success"
-      );
     } catch (error) {
+
       console.error(
         "Stop automatic mowing error:",
         error
       );
 
-      showMessage(
-        "Failed to stop automatic mowing.",
-        "error"
-      );
     } finally {
-      setAutomaticLoading(false);
+
+      setLoading(false);
+
     }
+
   };
 
   // ===================================================
-  // EMERGENCY STOP
+  // DRIVE ON
   // ===================================================
 
-  const emergencyStop = async () => {
-    setAutomaticLoading(true);
+  const driveOn = async () => {
 
-    try {
-      await set(
-        movementCommandRef,
-        "stop"
-      );
+    await sendFirebaseCommand(
+      "ecomow/mower/drive/command",
+      "ON"
+    );
 
-      await set(
-        driveCommandRef,
-        "OFF"
-      );
-
-      await set(
-        bladesCommandRef,
-        "OFF"
-      );
-
-      await set(
-        automaticCommandRef,
-        "STOP"
-      );
-
-      await set(
-        automaticStatusRef,
-        "STOPPED"
-      );
-
-      setMovementCommand("stop");
-      setDriveStatus("OFF");
-      setMowingStatus("OFF");
-      setAutomaticStatus("STOPPED");
-
-      showMessage(
-        "EMERGENCY STOP ACTIVATED.",
-        "success"
-      );
-    } catch (error) {
-      console.error(
-        "Emergency stop error:",
-        error
-      );
-
-      showMessage(
-        "Emergency stop command failed.",
-        "error"
-      );
-    } finally {
-      setAutomaticLoading(false);
-    }
   };
 
   // ===================================================
-  // STATUS HELPERS
+  // DRIVE OFF
+  // ===================================================
+
+  const driveOff = async () => {
+
+    await sendFirebaseCommand(
+      "ecomow/mower/drive/command",
+      "OFF"
+    );
+
+  };
+
+  // ===================================================
+  // MOWING ON
+  // ===================================================
+
+  const mowingOn = async () => {
+
+    await sendFirebaseCommand(
+      "ecomow/mower/blades/command",
+      "ON"
+    );
+
+  };
+
+  // ===================================================
+  // MOWING OFF
+  // ===================================================
+
+  const mowingOff = async () => {
+
+    await sendFirebaseCommand(
+      "ecomow/mower/blades/command",
+      "OFF"
+    );
+
+  };
+
+  // ===================================================
+  // MANUAL CONTROL NAVIGATION
+  // ===================================================
+
+  const openManualControl = () => {
+
+    // If parent navigation is provided,
+    // keep supporting it.
+    if (onNavigate) {
+
+      onNavigate("manual");
+
+      return;
+
+    }
+
+    // React Router navigation
+    navigate("/app/manual-control");
+
+  };
+
+  // ===================================================
+  // STATUS COLOR
   // ===================================================
 
   const isRunning =
@@ -602,250 +463,266 @@ export default function AutomaticControl() {
   // ===================================================
 
   return (
-    <div className="min-h-screen bg-[#F4F7F1] p-4 sm:p-6 lg:p-8">
 
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-[#f7f6ed] p-4 sm:p-6 lg:p-8">
+
+      <div className="max-w-7xl mx-auto space-y-6">
 
         {/* ================================================= */}
         {/* HEADER */}
         {/* ================================================= */}
 
-        <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-6 mb-6">
+        <div className="bg-white rounded-[2rem] border border-[#e4e4d8] shadow-sm p-5 sm:p-7">
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
 
-            <div>
+            {/* TITLE */}
 
-              <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
 
-                <div className="w-12 h-12 rounded-2xl bg-[#40513B] flex items-center justify-center">
+              <div className="w-14 h-14 rounded-2xl bg-[#40513B] flex items-center justify-center shadow-md">
 
-                  <RotateCw
-                    className="w-6 h-6 text-white"
-                  />
-
-                </div>
-
-                <div>
-
-                  <h1 className="text-2xl sm:text-3xl font-black text-[#2C3627]">
-
-                    Automatic Control
-
-                  </h1>
-
-                  <p className="text-sm text-gray-500 mt-1">
-
-                    ECOMOW automatic mowing control
-
-                  </p>
-
-                </div>
-
-              </div>
-
-            </div>
-
-            {/* CONNECTION */}
-
-            <div
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${
-                firebaseConnected
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                  : "bg-red-50 border-red-200 text-red-600"
-              }`}
-            >
-
-              {firebaseConnected ? (
-                <Wifi className="w-4 h-4" />
-              ) : (
-                <WifiOff className="w-4 h-4" />
-              )}
-
-              <span className="text-xs font-black uppercase">
-
-                {firebaseConnected
-                  ? "Firebase Online"
-                  : "Firebase Offline"}
-
-              </span>
-
-            </div>
-
-          </div>
-
-        </div>
-
-        {/* ================================================= */}
-        {/* MESSAGE */}
-        {/* ================================================= */}
-
-        {message && (
-          <div
-            className={`mb-6 rounded-2xl px-5 py-4 flex items-center gap-3 border ${
-              messageType === "success"
-                ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                : messageType === "warning"
-                ? "bg-amber-50 border-amber-200 text-amber-800"
-                : "bg-red-50 border-red-200 text-red-800"
-            }`}
-          >
-
-            {messageType === "success" && (
-              <CheckCircle2 className="w-5 h-5" />
-            )}
-
-            {messageType === "warning" && (
-              <AlertTriangle className="w-5 h-5" />
-            )}
-
-            {messageType === "error" && (
-              <ShieldAlert className="w-5 h-5" />
-            )}
-
-            <span className="text-sm font-bold">
-              {message}
-            </span>
-
-          </div>
-        )}
-
-        {/* ================================================= */}
-        {/* AUTOMATIC STATUS */}
-        {/* ================================================= */}
-
-        <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-6 mb-6">
-
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-
-            <div>
-
-              <p className="text-[10px] font-black uppercase tracking-[3px] text-gray-400">
-
-                Automatic Mowing Status
-
-              </p>
-
-              <div className="flex items-center gap-3 mt-2">
-
-                <span
-                  className={`w-4 h-4 rounded-full ${
-                    isRunning
-                      ? "bg-emerald-500 animate-pulse"
-                      : "bg-gray-300"
-                  }`}
-                />
-
-                <h2 className="text-2xl font-black text-[#2C3627]">
-
-                  {automaticStatus}
-
-                </h2>
-
-              </div>
-
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-
-              <div className="px-4 py-3 rounded-xl bg-gray-50 border border-gray-100">
-
-                <p className="text-[9px] font-black uppercase text-gray-400">
-
-                  Drive
-
-                </p>
-
-                <p
-                  className={`font-black text-sm ${
-                    driveStatus === "ON"
-                      ? "text-emerald-600"
-                      : "text-gray-500"
-                  }`}
-                >
-
-                  {driveStatus}
-
-                </p>
-
-              </div>
-
-              <div className="px-4 py-3 rounded-xl bg-gray-50 border border-gray-100">
-
-                <p className="text-[9px] font-black uppercase text-gray-400">
-
-                  Mowing
-
-                </p>
-
-                <p
-                  className={`font-black text-sm ${
-                    mowingStatus === "ON"
-                      ? "text-emerald-600"
-                      : "text-gray-500"
-                  }`}
-                >
-
-                  {mowingStatus}
-
-                </p>
-
-              </div>
-
-              <div className="px-4 py-3 rounded-xl bg-gray-50 border border-gray-100">
-
-                <p className="text-[9px] font-black uppercase text-gray-400">
-
-                  Movement
-
-                </p>
-
-                <p className="font-black text-sm uppercase text-gray-500">
-
-                  {movementCommand}
-
-                </p>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
-        {/* ================================================= */}
-        {/* AUTOMATIC CONTROLS */}
-        {/* ================================================= */}
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-
-          {/* START */}
-
-          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-6">
-
-            <div className="flex items-center gap-3 mb-5">
-
-              <div className="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center">
-
-                <Play
-                  className="w-5 h-5 text-emerald-700"
-                  fill="currentColor"
+                <RefreshCw
+                  className="w-7 h-7 text-white"
                 />
 
               </div>
 
               <div>
 
-                <h3 className="font-black text-[#2C3627]">
+                <h1 className="text-2xl sm:text-3xl font-black text-[#2C3627]">
+
+                  Automatic Control
+
+                </h1>
+
+                <p className="text-sm text-[#687362] mt-1">
+
+                  ECOMOW automatic mowing control
+
+                </p>
+
+              </div>
+
+            </div>
+
+            {/* RIGHT SIDE */}
+
+            <div className="flex flex-wrap items-center gap-3">
+
+              {/* FIREBASE */}
+
+              <div
+                className={`flex items-center gap-2 px-4 py-3 rounded-2xl border ${
+                  firebaseOnline
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                    : "bg-red-50 border-red-200 text-red-600"
+                }`}
+              >
+
+                {firebaseOnline ? (
+
+                  <Wifi className="w-4 h-4" />
+
+                ) : (
+
+                  <WifiOff className="w-4 h-4" />
+
+                )}
+
+                <span className="text-xs font-black uppercase tracking-wide">
+
+                  {firebaseOnline
+                    ? "Firebase Online"
+                    : "Firebase Offline"}
+
+                </span>
+
+              </div>
+
+              {/* MANUAL BUTTON */}
+
+              <button
+                type="button"
+                onClick={openManualControl}
+                className="group flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#40513B] hover:bg-[#2C3627] text-white font-black text-xs uppercase tracking-wide shadow-md hover:shadow-lg active:scale-95 transition-all"
+              >
+
+                <Hand className="w-4 h-4" />
+
+                Manual Control
+
+                <ArrowRight
+                  className="w-4 h-4 group-hover:translate-x-1 transition-transform"
+                />
+
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* ================================================= */}
+        {/* STATUS CARD */}
+        {/* ================================================= */}
+
+        <div className="bg-white rounded-[2rem] border border-[#e4e4d8] shadow-sm p-6">
+
+          <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+
+            <div className="lg:w-56">
+
+              <p className="text-[11px] font-black tracking-[3px] text-[#40513B] uppercase">
+
+                Automatic Mowing Status
+
+              </p>
+
+              <h2
+                className={`text-3xl font-black mt-2 ${
+                  isRunning
+                    ? "text-emerald-600"
+                    : "text-[#2C3627]"
+                }`}
+              >
+
+                {automaticStatus}
+
+              </h2>
+
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+
+              {/* DRIVE STATUS */}
+
+              <div className="min-w-[105px] px-5 py-4 rounded-2xl border border-[#e4e4d8] bg-[#fafaf5]">
+
+                <p className="text-[9px] font-black text-[#687362] uppercase tracking-wider">
+
+                  Drive
+
+                </p>
+
+                <div className="flex items-center gap-2 mt-2">
+
+                  <Circle
+                    className={`w-3 h-3 ${
+                      driveStatus === "ON"
+                        ? "fill-emerald-500 text-emerald-500"
+                        : "fill-slate-300 text-slate-300"
+                    }`}
+                  />
+
+                  <span className="font-black text-sm text-[#2C3627]">
+
+                    {driveStatus}
+
+                  </span>
+
+                </div>
+
+              </div>
+
+              {/* MOWING STATUS */}
+
+              <div className="min-w-[105px] px-5 py-4 rounded-2xl border border-[#e4e4d8] bg-[#fafaf5]">
+
+                <p className="text-[9px] font-black text-[#687362] uppercase tracking-wider">
+
+                  Mowing
+
+                </p>
+
+                <div className="flex items-center gap-2 mt-2">
+
+                  <Circle
+                    className={`w-3 h-3 ${
+                      mowingStatus === "ON"
+                        ? "fill-emerald-500 text-emerald-500"
+                        : "fill-slate-300 text-slate-300"
+                    }`}
+                  />
+
+                  <span className="font-black text-sm text-[#2C3627]">
+
+                    {mowingStatus}
+
+                  </span>
+
+                </div>
+
+              </div>
+
+              {/* MOVEMENT */}
+
+              <div className="min-w-[105px] px-5 py-4 rounded-2xl border border-[#e4e4d8] bg-[#fafaf5]">
+
+                <p className="text-[9px] font-black text-[#687362] uppercase tracking-wider">
+
+                  Movement
+
+                </p>
+
+                <div className="flex items-center gap-2 mt-2">
+
+                  <Circle
+                    className={`w-3 h-3 ${
+                      movementStatus !== "STOP"
+                        ? "fill-emerald-500 text-emerald-500"
+                        : "fill-slate-300 text-slate-300"
+                    }`}
+                  />
+
+                  <span className="font-black text-sm text-[#2C3627]">
+
+                    {movementStatus}
+
+                  </span>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* ================================================= */}
+        {/* START / STOP */}
+        {/* ================================================= */}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          {/* START */}
+
+          <div className="bg-white rounded-[2rem] border border-[#e4e4d8] shadow-sm p-6 sm:p-7">
+
+            <div className="flex items-start gap-4">
+
+              <div className="w-12 h-12 rounded-2xl bg-[#edf3e9] flex items-center justify-center">
+
+                <Play
+                  className="w-6 h-6 text-[#40513B] fill-[#40513B]"
+                />
+
+              </div>
+
+              <div>
+
+                <h3 className="text-lg font-black text-[#2C3627]">
 
                   Start Automatic Mowing
 
                 </h3>
 
-                <p className="text-xs text-gray-500">
+                <p className="text-sm text-[#687362] mt-1">
 
-                  Start drive and blade operation
+                  Drive ON + Mowing ON
 
                 </p>
 
@@ -856,63 +733,53 @@ export default function AutomaticControl() {
             <button
               type="button"
               onClick={startAutomaticMowing}
-              disabled={
-                automaticLoading ||
-                isRunning ||
-                driveStatus !== "ON" ||
-                mowingStatus !== "ON"
-              }
-              className="w-full py-5 rounded-2xl bg-[#40513B] hover:bg-[#2C3627] disabled:bg-gray-200 disabled:text-gray-400 text-white font-black tracking-wider transition active:scale-[0.98] flex items-center justify-center gap-3"
+              disabled={loading || isRunning}
+              className="mt-5 w-full bg-[#40513B] hover:bg-[#2C3627] disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-5 rounded-2xl font-black text-sm tracking-wide flex items-center justify-center gap-3 shadow-md active:scale-[0.98] transition-all"
             >
 
-              <Play
-                className="w-5 h-5"
-                fill="currentColor"
-              />
+              <Play className="w-5 h-5 fill-white" />
 
-              {automaticLoading
+              {loading
                 ? "STARTING..."
+                : isRunning
+                ? "MOWING ACTIVE"
                 : "START AUTOMATIC MOWING"}
 
             </button>
 
-            {(driveStatus !== "ON" ||
-              mowingStatus !== "ON") && (
-              <p className="text-xs text-amber-600 mt-3 text-center font-semibold">
+            <p className="text-[10px] text-center text-[#899183] mt-3 font-semibold">
 
-                Drive and Mowing must both be ON.
+              One click turns the automatic mowing system ON.
 
-              </p>
-            )}
+            </p>
 
           </div>
 
           {/* STOP */}
 
-          <div className="bg-white rounded-[2rem] shadow-sm border border-red-100 p-6">
+          <div className="bg-white rounded-[2rem] border border-red-100 shadow-sm p-6 sm:p-7">
 
-            <div className="flex items-center gap-3 mb-5">
+            <div className="flex items-start gap-4">
 
-              <div className="w-11 h-11 rounded-xl bg-red-100 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center">
 
                 <Square
-                  className="w-5 h-5 text-red-700"
-                  fill="currentColor"
+                  className="w-6 h-6 text-red-600 fill-red-600"
                 />
 
               </div>
 
               <div>
 
-                <h3 className="font-black text-red-700">
+                <h3 className="text-lg font-black text-red-700">
 
                   Stop Automatic Mowing
 
                 </h3>
 
-                <p className="text-xs text-gray-500">
+                <p className="text-sm text-[#687362] mt-1">
 
-                  Stop movement and both relays
+                  Drive OFF + Mowing OFF
 
                 </p>
 
@@ -923,37 +790,43 @@ export default function AutomaticControl() {
             <button
               type="button"
               onClick={stopAutomaticMowing}
-              disabled={automaticLoading}
-              className="w-full py-5 rounded-2xl bg-red-600 hover:bg-red-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-black tracking-wider transition active:scale-[0.98] flex items-center justify-center gap-3"
+              disabled={loading}
+              className="mt-5 w-full bg-white hover:bg-red-50 text-red-600 border-2 border-red-600 py-5 rounded-2xl font-black text-sm tracking-wide flex items-center justify-center gap-3 shadow-md active:scale-[0.98] transition-all"
             >
 
-              <CircleStop className="w-6 h-6" />
+              <Square className="w-5 h-5 fill-white" />
 
-              {automaticLoading
+              {loading
                 ? "STOPPING..."
                 : "STOP AUTOMATIC MOWING"}
 
             </button>
+
+            <p className="text-[10px] text-center text-[#899183] mt-3 font-semibold">
+
+              Turns Drive, Mowing, and Movement OFF.
+
+            </p>
 
           </div>
 
         </div>
 
         {/* ================================================= */}
-        {/* RELAY CONTROLS */}
+        {/* RELAY CONTROL */}
         {/* ================================================= */}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-          {/* DRIVE */}
+          {/* DRIVE RELAY */}
 
-          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-6">
+          <div className="bg-white rounded-[2rem] border border-[#e4e4d8] shadow-sm p-6 sm:p-7">
 
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-5">
 
               <div className="flex items-center gap-3">
 
-                <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center">
+                <div className="w-11 h-11 rounded-xl bg-[#edf3e9] flex items-center justify-center">
 
                   <Power className="w-5 h-5 text-[#40513B]" />
 
@@ -967,9 +840,9 @@ export default function AutomaticControl() {
 
                   </h3>
 
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-[#899183]">
 
-                    GPIO 27
+                    ESP32 Drive Control
 
                   </p>
 
@@ -978,10 +851,10 @@ export default function AutomaticControl() {
               </div>
 
               <span
-                className={`px-3 py-1 rounded-full text-[10px] font-black ${
+                className={`text-xs font-black ${
                   driveStatus === "ON"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-gray-100 text-gray-500"
+                    ? "text-emerald-600"
+                    : "text-slate-500"
                 }`}
               >
 
@@ -995,12 +868,8 @@ export default function AutomaticControl() {
 
               <button
                 type="button"
-                onClick={turnDriveOn}
-                disabled={
-                  driveLoading ||
-                  driveStatus === "ON"
-                }
-                className="py-4 rounded-xl bg-[#40513B] text-white font-black text-sm disabled:bg-gray-200 disabled:text-gray-400"
+                onClick={driveOn}
+                className="py-4 rounded-xl bg-[#40513B] hover:bg-[#2C3627] text-white font-black text-sm transition active:scale-95"
               >
 
                 DRIVE ON
@@ -1009,12 +878,8 @@ export default function AutomaticControl() {
 
               <button
                 type="button"
-                onClick={turnDriveOff}
-                disabled={
-                  driveLoading ||
-                  driveStatus === "OFF"
-                }
-                className="py-4 rounded-xl border border-gray-200 text-gray-700 font-black text-sm hover:bg-red-50 hover:text-red-600 disabled:text-gray-300"
+                onClick={driveOff}
+                className="py-4 rounded-xl border border-[#dfe2d9] hover:bg-red-50 hover:text-red-600 hover:border-red-200 text-[#40513B] font-black text-sm transition active:scale-95"
               >
 
                 DRIVE OFF
@@ -1023,19 +888,35 @@ export default function AutomaticControl() {
 
             </div>
 
+            <div className="mt-4 p-4 rounded-xl bg-[#fafaf5] border border-[#e9eadf]">
+
+              <p className="text-[9px] font-black uppercase tracking-wider text-[#899183]">
+
+                Firebase Command
+
+              </p>
+
+              <p className="text-[10px] font-mono text-[#52604d] mt-1 break-all">
+
+                ecomow/mower/drive/command
+
+              </p>
+
+            </div>
+
           </div>
 
-          {/* MOWING */}
+          {/* MOWING RELAY */}
 
-          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-6">
+          <div className="bg-white rounded-[2rem] border border-[#e4e4d8] shadow-sm p-6 sm:p-7">
 
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-5">
 
               <div className="flex items-center gap-3">
 
-                <div className="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center">
+                <div className="w-11 h-11 rounded-xl bg-[#edf3e9] flex items-center justify-center">
 
-                  <Scissors className="w-5 h-5 text-emerald-700" />
+                  <Scissors className="w-5 h-5 text-[#40513B]" />
 
                 </div>
 
@@ -1047,9 +928,9 @@ export default function AutomaticControl() {
 
                   </h3>
 
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-[#899183]">
 
-                    Blade motor relay
+                    Blade Motor Control
 
                   </p>
 
@@ -1058,10 +939,10 @@ export default function AutomaticControl() {
               </div>
 
               <span
-                className={`px-3 py-1 rounded-full text-[10px] font-black ${
+                className={`text-xs font-black ${
                   mowingStatus === "ON"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-gray-100 text-gray-500"
+                    ? "text-emerald-600"
+                    : "text-slate-500"
                 }`}
               >
 
@@ -1075,12 +956,8 @@ export default function AutomaticControl() {
 
               <button
                 type="button"
-                onClick={turnMowingOn}
-                disabled={
-                  mowingLoading ||
-                  mowingStatus === "ON"
-                }
-                className="py-4 rounded-xl bg-[#40513B] text-white font-black text-sm disabled:bg-gray-200 disabled:text-gray-400"
+                onClick={mowingOn}
+                className="py-4 rounded-xl bg-[#40513B] hover:bg-[#2C3627] text-white font-black text-sm transition active:scale-95"
               >
 
                 MOWING ON
@@ -1089,12 +966,8 @@ export default function AutomaticControl() {
 
               <button
                 type="button"
-                onClick={turnMowingOff}
-                disabled={
-                  mowingLoading ||
-                  mowingStatus === "OFF"
-                }
-                className="py-4 rounded-xl border border-gray-200 text-gray-700 font-black text-sm hover:bg-red-50 hover:text-red-600 disabled:text-gray-300"
+                onClick={mowingOff}
+                className="py-4 rounded-xl border border-[#dfe2d9] hover:bg-red-50 hover:text-red-600 hover:border-red-200 text-[#40513B] font-black text-sm transition active:scale-95"
               >
 
                 MOWING OFF
@@ -1103,34 +976,53 @@ export default function AutomaticControl() {
 
             </div>
 
+            <div className="mt-4 p-4 rounded-xl bg-[#fafaf5] border border-[#e9eadf]">
+
+              <p className="text-[9px] font-black uppercase tracking-wider text-[#899183]">
+
+                Firebase Command
+
+              </p>
+
+              <p className="text-[10px] font-mono text-[#52604d] mt-1 break-all">
+
+                ecomow/mower/blades/command
+
+              </p>
+
+            </div>
+
           </div>
 
         </div>
 
         {/* ================================================= */}
-        {/* EMERGENCY STOP */}
+        {/* MANUAL CONTROL CARD */}
         {/* ================================================= */}
 
-        <div className="bg-red-50 rounded-[2rem] border border-red-200 p-6">
+        <div className="bg-[#2C3627] rounded-[2rem] p-6 sm:p-8 shadow-lg">
 
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
 
-            <div className="flex items-start gap-3">
+            <div className="flex items-center gap-4">
 
-              <ShieldAlert className="w-7 h-7 text-red-600 mt-1" />
+              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center">
+
+                <Hand className="w-6 h-6 text-white" />
+
+              </div>
 
               <div>
 
-                <h3 className="font-black text-red-700">
+                <h3 className="text-lg font-black text-white">
 
-                  Emergency Stop
+                  Need Manual Control?
 
                 </h3>
 
-                <p className="text-sm text-red-600/80 mt-1">
+                <p className="text-sm text-white/60 mt-1">
 
-                  Immediately turns OFF the drive relay,
-                  mowing relay, and movement.
+                  Control the mower direction manually.
 
                 </p>
 
@@ -1140,12 +1032,15 @@ export default function AutomaticControl() {
 
             <button
               type="button"
-              onClick={emergencyStop}
-              disabled={automaticLoading}
-              className="w-full md:w-auto px-8 py-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black tracking-wider transition active:scale-95 disabled:bg-gray-300"
+              onClick={openManualControl}
+              className="flex items-center justify-center gap-3 bg-white text-[#2C3627] hover:bg-[#f0f2e9] px-6 py-4 rounded-2xl font-black text-sm transition active:scale-95"
             >
 
-              EMERGENCY STOP
+              <Hand className="w-5 h-5" />
+
+              OPEN MANUAL CONTROL
+
+              <ArrowRight className="w-5 h-5" />
 
             </button>
 
@@ -1153,8 +1048,28 @@ export default function AutomaticControl() {
 
         </div>
 
+        {/* ================================================= */}
+        {/* SAFETY */}
+        {/* ================================================= */}
+
+        <div className="flex items-center justify-center gap-2 py-3 text-xs text-[#687362]">
+
+          <ShieldAlert className="w-4 h-4 text-red-500" />
+
+          <span className="font-semibold">
+
+            Always stop the mower before switching between automatic and manual control.
+
+          </span>
+
+          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+
+        </div>
+
       </div>
 
     </div>
+
   );
+
 }
