@@ -13,7 +13,12 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-import { getDatabase, ref, onValue, off } from "firebase/database";
+import {
+  getDatabase,
+  ref,
+  onValue,
+  off,
+} from "firebase/database";
 
 // =====================================================
 // TYPES
@@ -32,6 +37,10 @@ interface MowerData {
     status?: string;
   };
 
+  mode?: {
+    current?: string;
+  };
+
   battery?: {
     mowing?: BatteryData;
     drive?: BatteryData;
@@ -39,14 +48,26 @@ interface MowerData {
 
   blades?: {
     command?: string;
+    status?: string;
   };
 
   drive?: {
     command?: string;
+    status?: string;
   };
 
   movement?: {
     command?: string;
+  };
+
+  steering?: {
+    command?: string;
+    status?: string;
+  };
+
+  automatic?: {
+    command?: string;
+    status?: string;
   };
 }
 
@@ -73,7 +94,8 @@ export default function ReportDashboard() {
   // STATE
   // ===================================================
 
-  const [mower, setMower] = useState<MowerData>(defaultMower);
+  const [mower, setMower] =
+    useState<MowerData>(defaultMower);
 
   const [mowingBattery, setMowingBattery] =
     useState<BatteryData>(defaultBattery);
@@ -94,121 +116,195 @@ export default function ReportDashboard() {
   useEffect(() => {
     const database = getDatabase();
 
-    const mowerRef = ref(database, "mower");
+    // IMPORTANT:
+    // Firebase structure:
+    // ecomow/mower/...
+    const mowerRef = ref(
+      database,
+      "ecomow/mower"
+    );
 
     const handleValue = (snapshot: any) => {
       const data = snapshot.val();
 
-      console.log("=================================");
-      console.log("ECOMOW REALTIME DATABASE UPDATE");
+      console.log(
+        "================================="
+      );
+      console.log(
+        "ECOMOW REALTIME DATABASE UPDATE"
+      );
       console.log(data);
-      console.log("=================================");
+      console.log(
+        "================================="
+      );
 
-      if (!data) {
-        setFirebaseConnected(true);
-        setLastUpdated(new Date().toLocaleTimeString());
-        return;
-      }
-
-      // =================================================
-      // SAVE COMPLETE MOWER DATA
-      // =================================================
-
-      setMower(data);
-
-      // =================================================
-      // MOWING BATTERY
-      // =================================================
-
-      if (data.battery?.mowing) {
-        const mowing = data.battery.mowing;
-
-        const updatedMowingBattery: BatteryData = {
-          voltage: Number(mowing.voltage) || 0,
-          current: Number(mowing.current) || 0,
-          power: Number(mowing.power) || 0,
-          percentage: Number(mowing.percentage) || 0,
-          status: String(mowing.status || "UNKNOWN"),
-        };
-
-        console.log("🔋 MOWING BATTERY");
-        console.log(
-          "Voltage:",
-          updatedMowingBattery.voltage,
-          "V"
-        );
-        console.log(
-          "Current:",
-          updatedMowingBattery.current,
-          "A"
-        );
-        console.log(
-          "Power:",
-          updatedMowingBattery.power,
-          "W"
-        );
-        console.log(
-          "Percentage:",
-          updatedMowingBattery.percentage,
-          "%"
-        );
-        console.log(
-          "Status:",
-          updatedMowingBattery.status
-        );
-
-        setMowingBattery(updatedMowingBattery);
-      }
-
-      // =================================================
-      // DRIVE BATTERY
-      // =================================================
-
-      if (data.battery?.drive) {
-        const drive = data.battery.drive;
-
-        const updatedDriveBattery: BatteryData = {
-          voltage: Number(drive.voltage) || 0,
-          current: Number(drive.current) || 0,
-          power: Number(drive.power) || 0,
-          percentage: Number(drive.percentage) || 0,
-          status: String(drive.status || "UNKNOWN"),
-        };
-
-        console.log("🚗 DRIVE BATTERY");
-        console.log(
-          "Voltage:",
-          updatedDriveBattery.voltage,
-          "V"
-        );
-        console.log(
-          "Current:",
-          updatedDriveBattery.current,
-          "A"
-        );
-        console.log(
-          "Power:",
-          updatedDriveBattery.power,
-          "W"
-        );
-        console.log(
-          "Percentage:",
-          updatedDriveBattery.percentage,
-          "%"
-        );
-        console.log(
-          "Status:",
-          updatedDriveBattery.status
-        );
-
-        setDriveBattery(updatedDriveBattery);
-      }
+      // -------------------------------------------------
+      // Firebase connected
+      // -------------------------------------------------
 
       setFirebaseConnected(true);
 
       setLastUpdated(
         new Date().toLocaleTimeString()
       );
+
+      // -------------------------------------------------
+      // No mower data
+      // -------------------------------------------------
+
+      if (!data) {
+        setMower(defaultMower);
+        setMowingBattery(defaultBattery);
+        setDriveBattery(defaultBattery);
+
+        return;
+      }
+
+      // -------------------------------------------------
+      // SAVE COMPLETE MOWER DATA
+      // -------------------------------------------------
+
+      setMower(data);
+
+      // =================================================
+      // MOWING BATTERY
+      // Path:
+      // ecomow/mower/battery/mowing
+      // =================================================
+
+      if (data.battery?.mowing) {
+        const mowing = data.battery.mowing;
+
+        const updatedMowingBattery: BatteryData = {
+          voltage:
+            Number(mowing.voltage) || 0,
+
+          current:
+            Number(mowing.current) || 0,
+
+          power:
+            Number(mowing.power) || 0,
+
+          percentage:
+            Number(mowing.percentage) || 0,
+
+          status:
+            String(
+              mowing.status || "UNKNOWN"
+            ),
+        };
+
+        console.log(
+          "🔋 MOWING BATTERY"
+        );
+
+        console.log(
+          "Voltage:",
+          updatedMowingBattery.voltage,
+          "V"
+        );
+
+        console.log(
+          "Current:",
+          updatedMowingBattery.current,
+          "A"
+        );
+
+        console.log(
+          "Power:",
+          updatedMowingBattery.power,
+          "W"
+        );
+
+        console.log(
+          "Percentage:",
+          updatedMowingBattery.percentage,
+          "%"
+        );
+
+        console.log(
+          "Status:",
+          updatedMowingBattery.status
+        );
+
+        setMowingBattery(
+          updatedMowingBattery
+        );
+      } else {
+        setMowingBattery(
+          defaultBattery
+        );
+      }
+
+      // =================================================
+      // DRIVE BATTERY
+      // Path:
+      // ecomow/mower/battery/drive
+      // =================================================
+
+      if (data.battery?.drive) {
+        const drive = data.battery.drive;
+
+        const updatedDriveBattery: BatteryData = {
+          voltage:
+            Number(drive.voltage) || 0,
+
+          current:
+            Number(drive.current) || 0,
+
+          power:
+            Number(drive.power) || 0,
+
+          percentage:
+            Number(drive.percentage) || 0,
+
+          status:
+            String(
+              drive.status || "UNKNOWN"
+            ),
+        };
+
+        console.log(
+          "🚗 DRIVE BATTERY"
+        );
+
+        console.log(
+          "Voltage:",
+          updatedDriveBattery.voltage,
+          "V"
+        );
+
+        console.log(
+          "Current:",
+          updatedDriveBattery.current,
+          "A"
+        );
+
+        console.log(
+          "Power:",
+          updatedDriveBattery.power,
+          "W"
+        );
+
+        console.log(
+          "Percentage:",
+          updatedDriveBattery.percentage,
+          "%"
+        );
+
+        console.log(
+          "Status:",
+          updatedDriveBattery.status
+        );
+
+        setDriveBattery(
+          updatedDriveBattery
+        );
+      } else {
+        setDriveBattery(
+          defaultBattery
+        );
+      }
     };
 
     const handleError = (error: Error) => {
@@ -218,8 +314,15 @@ export default function ReportDashboard() {
       );
 
       setFirebaseConnected(false);
-      setLastUpdated("Connection error");
+
+      setLastUpdated(
+        "Connection error"
+      );
     };
+
+    // -------------------------------------------------
+    // START REALTIME LISTENER
+    // -------------------------------------------------
 
     onValue(
       mowerRef,
@@ -227,9 +330,9 @@ export default function ReportDashboard() {
       handleError
     );
 
-    // =================================================
+    // -------------------------------------------------
     // CLEANUP
-    // =================================================
+    // -------------------------------------------------
 
     return () => {
       off(mowerRef);
@@ -241,34 +344,76 @@ export default function ReportDashboard() {
   // ===================================================
 
   const connectionStatus =
-    mower.connection?.status || "OFFLINE";
+    mower.connection?.status ||
+    "OFFLINE";
+
+  const mode =
+    mower.mode?.current ||
+    "UNKNOWN";
 
   const driveCommand =
-    mower.drive?.command || "OFF";
+    mower.drive?.command ||
+    "OFF";
+
+  const driveStatus =
+    mower.drive?.status ||
+    "OFF";
 
   const bladeCommand =
-    mower.blades?.command || "OFF";
+    mower.blades?.command ||
+    "OFF";
+
+  const bladeStatus =
+    mower.blades?.status ||
+    "OFF";
 
   const movementCommand =
-    mower.movement?.command || "STOP";
+    mower.movement?.command ||
+    "STOP";
+
+  const steeringCommand =
+    mower.steering?.command ||
+    "STOP";
+
+  const automaticCommand =
+    mower.automatic?.command ||
+    "STOP";
+
+  const automaticStatus =
+    mower.automatic?.status ||
+    "STOPPED";
+
+  // ===================================================
+  // BATTERY VALUES
+  // ===================================================
 
   const mowingPercentage =
-    Number(mowingBattery.percentage) || 0;
+    Number(
+      mowingBattery.percentage
+    ) || 0;
 
   const drivePercentage =
-    Number(driveBattery.percentage) || 0;
+    Number(
+      driveBattery.percentage
+    ) || 0;
 
   const averageBattery =
-    drivePercentage > 0 && mowingPercentage > 0
-      ? (drivePercentage + mowingPercentage) / 2
-      : mowingPercentage || drivePercentage;
+    drivePercentage > 0 &&
+    mowingPercentage > 0
+      ? (drivePercentage +
+          mowingPercentage) /
+        2
+      : mowingPercentage ||
+        drivePercentage;
 
   const mowingHealthy =
-    mowingBattery.status.toUpperCase() ===
+    mowingBattery.status
+      .toUpperCase() ===
     "HEALTHY";
 
   const driveHealthy =
-    driveBattery.status.toUpperCase() ===
+    driveBattery.status
+      .toUpperCase() ===
     "HEALTHY";
 
   // ===================================================
@@ -292,64 +437,133 @@ export default function ReportDashboard() {
 
   const handleExportReport = () => {
     const report = {
-      generatedAt: new Date().toISOString(),
+      generatedAt:
+        new Date().toISOString(),
 
       firebase: {
-        connected: firebaseConnected,
+        connected:
+          firebaseConnected,
+
         lastUpdated,
       },
 
       mower: {
-        connection: connectionStatus,
-        drive: driveCommand,
-        blades: bladeCommand,
-        movement: movementCommand,
+        connection:
+          connectionStatus,
+
+        mode,
+
+        drive: {
+          command:
+            driveCommand,
+
+          status:
+            driveStatus,
+        },
+
+        blades: {
+          command:
+            bladeCommand,
+
+          status:
+            bladeStatus,
+        },
+
+        movement:
+          movementCommand,
+
+        steering: {
+          command:
+            steeringCommand,
+        },
+
+        automatic: {
+          command:
+            automaticCommand,
+
+          status:
+            automaticStatus,
+        },
       },
 
       battery: {
         mowing: {
-          voltage: mowingBattery.voltage,
-          current: mowingBattery.current,
-          power: mowingBattery.power,
-          percentage: mowingBattery.percentage,
-          status: mowingBattery.status,
+          voltage:
+            mowingBattery.voltage,
+
+          current:
+            mowingBattery.current,
+
+          power:
+            mowingBattery.power,
+
+          percentage:
+            mowingBattery.percentage,
+
+          status:
+            mowingBattery.status,
         },
 
         drive: {
-          voltage: driveBattery.voltage,
-          current: driveBattery.current,
-          power: driveBattery.power,
-          percentage: driveBattery.percentage,
-          status: driveBattery.status,
+          voltage:
+            driveBattery.voltage,
+
+          current:
+            driveBattery.current,
+
+          power:
+            driveBattery.power,
+
+          percentage:
+            driveBattery.percentage,
+
+          status:
+            driveBattery.status,
         },
 
-        averagePercentage: averageBattery,
+        averagePercentage:
+          averageBattery,
       },
     };
 
     const blob = new Blob(
-      [JSON.stringify(report, null, 2)],
+      [
+        JSON.stringify(
+          report,
+          null,
+          2
+        ),
+      ],
       {
-        type: "application/json",
+        type:
+          "application/json",
       }
     );
 
     const url =
-      URL.createObjectURL(blob);
+      URL.createObjectURL(
+        blob
+      );
 
     const a =
-      document.createElement("a");
+      document.createElement(
+        "a"
+      );
 
     a.href = url;
 
     a.download =
       `ECOMOW-Report-${Date.now()}.json`;
 
-    document.body.appendChild(a);
+    document.body.appendChild(
+      a
+    );
 
     a.click();
 
-    document.body.removeChild(a);
+    document.body.removeChild(
+      a
+    );
 
     URL.revokeObjectURL(url);
   };
@@ -361,7 +575,9 @@ export default function ReportDashboard() {
   const getBatteryStatusClass = (
     status: string
   ) => {
-    switch (status.toUpperCase()) {
+    switch (
+      status.toUpperCase()
+    ) {
       case "HEALTHY":
         return "bg-green-50 text-green-600";
 
@@ -384,7 +600,7 @@ export default function ReportDashboard() {
   // ===================================================
 
   return (
-    <div className="w-full">
+    <div>
       {/* =================================================
           HEADER
       ================================================= */}
@@ -406,26 +622,18 @@ export default function ReportDashboard() {
           </h1>
 
           <p className="mt-2 max-w-2xl text-sm font-medium text-white/80 drop-shadow">
-            Monitor ECOMOW performance, battery health,
-            energy usage, and system activity in real time.
+            Monitor ECOMOW performance,
+            battery health, energy usage,
+            and system activity in real time.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={handleExportReport}
-          className="
-            flex items-center justify-center gap-2
-            rounded-2xl
-            bg-[#40513B]
-            px-5 py-3
-            text-sm font-black uppercase tracking-wider
-            text-white
-            shadow-lg shadow-black/20
-            transition-all
-            hover:bg-[#2C3627]
-            active:scale-[0.97]
-          "
+          onClick={
+            handleExportReport
+          }
+          className="flex items-center justify-center gap-2 rounded-2xl bg-[#40513B] px-5 py-3 text-sm font-black uppercase tracking-wider text-white shadow-lg shadow-black/20 transition-all hover:bg-[#2C3627] active:scale-[0.97]"
         >
           <Download size={18} />
           Export Report
@@ -437,28 +645,19 @@ export default function ReportDashboard() {
       ================================================= */}
 
       <div
-        className={`
-          mb-8 flex flex-col gap-4 rounded-[1.5rem]
-          border p-5 shadow-lg
-          sm:flex-row sm:items-center sm:justify-between
-          ${
-            firebaseConnected
-              ? "border-green-200 bg-green-50/95"
-              : "border-red-200 bg-red-50/95"
-          }
-        `}
+        className={`mb-8 flex flex-col gap-4 rounded-[1.5rem] border p-5 shadow-lg sm:flex-row sm:items-center sm:justify-between ${
+          firebaseConnected
+            ? "border-green-200 bg-green-50/95"
+            : "border-red-200 bg-red-50/95"
+        }`}
       >
         <div className="flex items-center gap-3">
           <div
-            className={`
-              flex h-11 w-11 items-center justify-center
-              rounded-2xl
-              ${
-                firebaseConnected
-                  ? "bg-green-100"
-                  : "bg-red-100"
-              }
-            `}
+            className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
+              firebaseConnected
+                ? "bg-green-100"
+                : "bg-red-100"
+            }`}
           >
             {firebaseConnected ? (
               <CheckCircle2 className="h-6 w-6 text-green-600" />
@@ -469,14 +668,11 @@ export default function ReportDashboard() {
 
           <div>
             <p
-              className={`
-                text-sm font-black
-                ${
-                  firebaseConnected
-                    ? "text-green-700"
-                    : "text-red-700"
-                }
-              `}
+              className={`text-sm font-black ${
+                firebaseConnected
+                  ? "text-green-700"
+                  : "text-red-700"
+              }`}
             >
               {firebaseConnected
                 ? "Firebase Realtime Connected"
@@ -484,7 +680,8 @@ export default function ReportDashboard() {
             </p>
 
             <p className="text-xs font-medium text-[#6D7C66]">
-              Last update: {lastUpdated}
+              Last update:{" "}
+              {lastUpdated}
             </p>
           </div>
         </div>
@@ -495,16 +692,12 @@ export default function ReportDashboard() {
           </span>
 
           <span
-            className={`
-              rounded-full px-3 py-1.5
-              text-xs font-black uppercase
-              ${
-                connectionStatus.toUpperCase() ===
-                "ONLINE"
-                  ? "bg-green-100 text-green-700"
-                  : "bg-red-100 text-red-700"
-              }
-            `}
+            className={`rounded-full px-3 py-1.5 text-xs font-black uppercase ${
+              connectionStatus.toUpperCase() ===
+              "ONLINE"
+                ? "bg-green-100 text-green-700"
+                : "bg-red-100 text-red-700"
+            }`}
           >
             {connectionStatus}
           </span>
@@ -515,15 +708,7 @@ export default function ReportDashboard() {
           REPORT BUILDER
       ================================================= */}
 
-      <div
-        className="
-          mb-8 overflow-hidden
-          rounded-[2rem]
-          border border-white/50
-          bg-white/95
-          shadow-xl
-        "
-      >
+      <div className="mb-8 overflow-hidden rounded-[2rem] border border-white/50 bg-white/95 shadow-xl">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto]">
           <div className="p-6 sm:p-8 lg:p-10">
             <div className="mb-5 flex items-center gap-3">
@@ -543,9 +728,11 @@ export default function ReportDashboard() {
             </div>
 
             <p className="max-w-2xl text-sm font-medium leading-6 text-[#6D7C66]">
-              Generate and review ECOMOW system reports.
-              Battery information is retrieved directly
-              from Firebase Realtime Database.
+              Generate and review ECOMOW
+              system reports. Battery
+              information is retrieved
+              directly from Firebase
+              Realtime Database.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -578,7 +765,22 @@ export default function ReportDashboard() {
                 />
 
                 <span className="text-xs font-bold text-[#40513B]">
-                  {formatNumber(averageBattery, 1)}%
+                  {formatNumber(
+                    averageBattery,
+                    1
+                  )}
+                  %
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 rounded-xl bg-[#F8FAF7] px-3 py-2">
+                <Cpu
+                  size={15}
+                  className="text-[#628141]"
+                />
+
+                <span className="text-xs font-bold text-[#40513B]">
+                  {mode}
                 </span>
               </div>
             </div>
@@ -610,6 +812,7 @@ export default function ReportDashboard() {
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {/* MOWING BATTERY */}
+
         <div className="rounded-[1.7rem] border border-white/60 bg-white/95 p-5 shadow-lg transition hover:-translate-y-1 hover:shadow-xl">
           <div className="flex items-start justify-between">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50">
@@ -617,13 +820,9 @@ export default function ReportDashboard() {
             </div>
 
             <span
-              className={`
-                rounded-full px-2.5 py-1
-                text-[9px] font-black uppercase tracking-wider
-                ${getBatteryStatusClass(
-                  mowingBattery.status
-                )}
-              `}
+              className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${getBatteryStatusClass(
+                mowingBattery.status
+              )}`}
             >
               {mowingBattery.status}
             </span>
@@ -652,7 +851,48 @@ export default function ReportDashboard() {
           </div>
         </div>
 
+        {/* DRIVE BATTERY */}
+
+        <div className="rounded-[1.7rem] border border-white/60 bg-white/95 p-5 shadow-lg transition hover:-translate-y-1 hover:shadow-xl">
+          <div className="flex items-start justify-between">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50">
+              <Battery className="h-6 w-6 text-blue-600" />
+            </div>
+
+            <span
+              className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${getBatteryStatusClass(
+                driveBattery.status
+              )}`}
+            >
+              {driveBattery.status}
+            </span>
+          </div>
+
+          <p className="mt-5 text-xs font-bold uppercase tracking-widest text-[#6D7C66]">
+            Drive Battery
+          </p>
+
+          <div className="mt-1 flex items-end justify-between">
+            <p className="text-3xl font-black text-[#40513B]">
+              {formatNumber(
+                driveBattery.percentage,
+                1
+              )}
+              %
+            </p>
+
+            <span className="text-xs font-bold text-blue-600">
+              {formatNumber(
+                driveBattery.voltage,
+                2
+              )}{" "}
+              V
+            </span>
+          </div>
+        </div>
+
         {/* CURRENT */}
+
         <div className="rounded-[1.7rem] border border-white/60 bg-white/95 p-5 shadow-lg transition hover:-translate-y-1 hover:shadow-xl">
           <div className="flex items-start justify-between">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-yellow-50">
@@ -683,38 +923,8 @@ export default function ReportDashboard() {
           </div>
         </div>
 
-        {/* POWER */}
-        <div className="rounded-[1.7rem] border border-white/60 bg-white/95 p-5 shadow-lg transition hover:-translate-y-1 hover:shadow-xl">
-          <div className="flex items-start justify-between">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50">
-              <Activity className="h-6 w-6 text-blue-600" />
-            </div>
-
-            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-blue-600">
-              LIVE
-            </span>
-          </div>
-
-          <p className="mt-5 text-xs font-bold uppercase tracking-widest text-[#6D7C66]">
-            Power
-          </p>
-
-          <div className="mt-1 flex items-end justify-between">
-            <p className="text-3xl font-black text-[#40513B]">
-              {formatNumber(
-                mowingBattery.power,
-                3
-              )}{" "}
-              W
-            </p>
-
-            <span className="text-xs font-bold text-blue-600">
-              Mowing
-            </span>
-          </div>
-        </div>
-
         {/* SYSTEM */}
+
         <div className="rounded-[1.7rem] border border-white/60 bg-white/95 p-5 shadow-lg transition hover:-translate-y-1 hover:shadow-xl">
           <div className="flex items-start justify-between">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50">
@@ -722,16 +932,12 @@ export default function ReportDashboard() {
             </div>
 
             <span
-              className={`
-                rounded-full px-2.5 py-1
-                text-[9px] font-black uppercase tracking-wider
-                ${
-                  connectionStatus.toUpperCase() ===
-                  "ONLINE"
-                    ? "bg-green-50 text-green-600"
-                    : "bg-red-50 text-red-600"
-                }
-              `}
+              className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider ${
+                connectionStatus.toUpperCase() ===
+                "ONLINE"
+                  ? "bg-green-50 text-green-600"
+                  : "bg-red-50 text-red-600"
+              }`}
             >
               {connectionStatus}
             </span>
@@ -754,7 +960,7 @@ export default function ReportDashboard() {
       </div>
 
       {/* =================================================
-          MOWING BATTERY - COMPLETE REALTIME DATA
+          MOWING BATTERY
       ================================================= */}
 
       <div className="mb-8 rounded-[2rem] border border-white/60 bg-white/95 p-6 shadow-xl">
@@ -770,20 +976,17 @@ export default function ReportDashboard() {
               </h3>
 
               <p className="text-xs text-[#6D7C66]">
-                INA226 real-time measurements
+                Realtime battery
+                measurements
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
             <span
-              className={`
-                rounded-full px-3 py-1.5
-                text-xs font-black
-                ${getBatteryStatusClass(
-                  mowingBattery.status
-                )}
-              `}
+              className={`rounded-full px-3 py-1.5 text-xs font-black ${getBatteryStatusClass(
+                mowingBattery.status
+              )}`}
             >
               {mowingBattery.status}
             </span>
@@ -791,97 +994,69 @@ export default function ReportDashboard() {
             {firebaseConnected && (
               <span className="flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-xs font-black text-green-600">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
-                UPLOADED
+                LIVE
               </span>
             )}
           </div>
         </div>
 
-        {/* =================================================
-            COMPLETE BATTERY VALUES
-        ================================================= */}
-
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {/* VOLTAGE */}
+
           <div className="rounded-2xl bg-[#F8FAF7] p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
-                Voltage
-              </p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
+              Voltage
+            </p>
 
-              <Zap className="h-4 w-4 text-green-600" />
-            </div>
-
-            <p className="text-2xl font-black text-[#40513B]">
+            <p className="mt-2 text-2xl font-black text-[#40513B]">
               {formatNumber(
                 mowingBattery.voltage,
                 2
               )}{" "}
               V
             </p>
-
-            <p className="mt-1 text-[10px] font-bold text-[#6D7C66]">
-              Battery voltage
-            </p>
           </div>
 
           {/* CURRENT */}
+
           <div className="rounded-2xl bg-[#F8FAF7] p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
-                Current
-              </p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
+              Current
+            </p>
 
-              <Activity className="h-4 w-4 text-yellow-500" />
-            </div>
-
-            <p className="text-2xl font-black text-[#40513B]">
+            <p className="mt-2 text-2xl font-black text-[#40513B]">
               {formatNumber(
                 mowingBattery.current,
                 3
               )}{" "}
               A
             </p>
-
-            <p className="mt-1 text-[10px] font-bold text-[#6D7C66]">
-              INA226 current
-            </p>
           </div>
 
           {/* POWER */}
+
           <div className="rounded-2xl bg-[#F8FAF7] p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
-                Power
-              </p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
+              Power
+            </p>
 
-              <BarChart3 className="h-4 w-4 text-blue-600" />
-            </div>
-
-            <p className="text-2xl font-black text-[#40513B]">
+            <p className="mt-2 text-2xl font-black text-[#40513B]">
               {formatNumber(
                 mowingBattery.power,
                 3
               )}{" "}
               W
             </p>
-
-            <p className="mt-1 text-[10px] font-bold text-[#6D7C66]">
-              Instant power
-            </p>
           </div>
 
           {/* PERCENTAGE */}
+
           <div className="rounded-2xl bg-[#F8FAF7] p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
-                Percentage
-              </p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
+              Percentage
+            </p>
 
-              <Battery className="h-4 w-4 text-green-600" />
-            </div>
-
-            <p className="text-2xl font-black text-[#40513B]">
+            <p className="mt-2 text-2xl font-black text-[#40513B]">
               {formatNumber(
                 mowingBattery.percentage,
                 1
@@ -906,60 +1081,39 @@ export default function ReportDashboard() {
           </div>
 
           {/* STATUS */}
-          <div className="rounded-2xl bg-[#F8FAF7] p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
-                Status
-              </p>
 
+          <div className="rounded-2xl bg-[#F8FAF7] p-5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
+              Status
+            </p>
+
+            <div className="mt-2 flex items-center gap-2">
               {mowingHealthy ? (
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
               ) : (
                 <AlertTriangle className="h-4 w-4 text-yellow-500" />
               )}
+
+              <p className="text-xl font-black text-[#40513B]">
+                {mowingBattery.status}
+              </p>
             </div>
-
-            <p className="text-xl font-black text-[#40513B]">
-              {mowingBattery.status}
-            </p>
-
-            <p className="mt-1 text-[10px] font-bold text-[#6D7C66]">
-              Battery health
-            </p>
           </div>
         </div>
 
-        {/* =================================================
-            UPLOAD INFORMATION
-        ================================================= */}
-
         <div className="mt-5 rounded-2xl border border-green-100 bg-green-50/70 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-wider text-green-700">
-                Firebase Realtime Data
-              </p>
+          <p className="text-xs font-black uppercase tracking-wider text-green-700">
+            Firebase Realtime Data
+          </p>
 
-              <p className="mt-1 text-[11px] font-medium text-green-700/80">
-                Voltage, current, power, percentage,
-                and status are being read from:
-              </p>
+          <p className="mt-1 text-[11px] font-medium text-green-700/80">
+            Battery data is being
+            read from:
+          </p>
 
-              <code className="mt-1 block text-[11px] font-bold text-[#40513B]">
-                mower/battery/mowing
-              </code>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-
-              <span className="text-xs font-black text-green-700">
-                {firebaseConnected
-                  ? "DATA RECEIVED"
-                  : "WAITING"}
-              </span>
-            </div>
-          </div>
+          <code className="mt-1 block text-[11px] font-bold text-[#40513B]">
+            ecomow/mower/battery/mowing
+          </code>
         </div>
       </div>
 
@@ -980,19 +1134,16 @@ export default function ReportDashboard() {
               </h3>
 
               <p className="text-xs text-[#6D7C66]">
-                Realtime battery measurements
+                Realtime battery
+                measurements
               </p>
             </div>
           </div>
 
           <span
-            className={`
-              rounded-full px-3 py-1.5
-              text-xs font-black
-              ${getBatteryStatusClass(
-                driveBattery.status
-              )}
-            `}
+            className={`rounded-full px-3 py-1.5 text-xs font-black ${getBatteryStatusClass(
+              driveBattery.status
+            )}`}
           >
             {driveBattery.status}
           </span>
@@ -1000,6 +1151,7 @@ export default function ReportDashboard() {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {/* VOLTAGE */}
+
           <div className="rounded-2xl bg-[#F8FAF7] p-5">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
               Voltage
@@ -1015,6 +1167,7 @@ export default function ReportDashboard() {
           </div>
 
           {/* CURRENT */}
+
           <div className="rounded-2xl bg-[#F8FAF7] p-5">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
               Current
@@ -1030,6 +1183,7 @@ export default function ReportDashboard() {
           </div>
 
           {/* POWER */}
+
           <div className="rounded-2xl bg-[#F8FAF7] p-5">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
               Power
@@ -1045,6 +1199,7 @@ export default function ReportDashboard() {
           </div>
 
           {/* PERCENTAGE */}
+
           <div className="rounded-2xl bg-[#F8FAF7] p-5">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
               Percentage
@@ -1075,13 +1230,110 @@ export default function ReportDashboard() {
           </div>
 
           {/* STATUS */}
+
           <div className="rounded-2xl bg-[#F8FAF7] p-5">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
               Status
             </p>
 
-            <p className="mt-2 text-xl font-black text-[#40513B]">
-              {driveBattery.status}
+            <div className="mt-2 flex items-center gap-2">
+              {driveHealthy ? (
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 text-yellow-500" />
+              )}
+
+              <p className="text-xl font-black text-[#40513B]">
+                {driveBattery.status}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+          <p className="text-xs font-black uppercase tracking-wider text-blue-700">
+            Firebase Realtime Data
+          </p>
+
+          <p className="mt-1 text-[11px] font-medium text-blue-700/80">
+            Battery data is being
+            read from:
+          </p>
+
+          <code className="mt-1 block text-[11px] font-bold text-[#40513B]">
+            ecomow/mower/battery/drive
+          </code>
+        </div>
+      </div>
+
+      {/* =================================================
+          SYSTEM INFORMATION
+      ================================================= */}
+
+      <div className="mb-8 rounded-[2rem] border border-white/60 bg-white/95 p-6 shadow-xl">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-50">
+            <Cpu className="h-5 w-5 text-purple-600" />
+          </div>
+
+          <div>
+            <h3 className="font-black text-[#40513B]">
+              Mower System Status
+            </h3>
+
+            <p className="text-xs text-[#6D7C66]">
+              Live ECOMOW controller
+              information
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl bg-[#F8FAF7] p-5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
+              Mode
+            </p>
+
+            <p className="mt-2 text-2xl font-black text-[#40513B]">
+              {mode}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-[#F8FAF7] p-5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
+              Drive
+            </p>
+
+            <p className="mt-2 text-2xl font-black text-[#40513B]">
+              {driveCommand}
+            </p>
+
+            <p className="mt-1 text-[10px] font-bold text-[#6D7C66]">
+              Status: {driveStatus}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-[#F8FAF7] p-5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
+              Blades
+            </p>
+
+            <p className="mt-2 text-2xl font-black text-[#40513B]">
+              {bladeCommand}
+            </p>
+
+            <p className="mt-1 text-[10px] font-bold text-[#6D7C66]">
+              Status: {bladeStatus}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-[#F8FAF7] p-5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-[#6D7C66]">
+              Movement
+            </p>
+
+            <p className="mt-2 text-2xl font-black text-[#40513B]">
+              {movementCommand}
             </p>
           </div>
         </div>
@@ -1104,14 +1356,17 @@ export default function ReportDashboard() {
               </h3>
 
               <p className="mt-1 text-xs font-medium text-[#6D7C66]">
-                Current ECOMOW system information
+                Current ECOMOW system
+                information
               </p>
             </div>
           </div>
 
           <button
             type="button"
-            onClick={handleExportReport}
+            onClick={
+              handleExportReport
+            }
             className="flex items-center justify-center gap-2 rounded-xl bg-[#F8FAF7] px-4 py-2.5 text-xs font-black text-[#40513B] transition hover:bg-[#628141]/10"
           >
             <Download size={15} />
@@ -1139,6 +1394,7 @@ export default function ReportDashboard() {
 
             <tbody>
               {/* FIREBASE */}
+
               <tr className="border-b border-gray-100">
                 <td className="px-6 py-5 font-black text-[#40513B]">
                   Firebase
@@ -1150,15 +1406,11 @@ export default function ReportDashboard() {
 
                 <td className="px-6 py-5">
                   <span
-                    className={`
-                      rounded-full px-3 py-1.5
-                      text-xs font-black
-                      ${
-                        firebaseConnected
-                          ? "bg-green-50 text-green-600"
-                          : "bg-red-50 text-red-600"
-                      }
-                    `}
+                    className={`rounded-full px-3 py-1.5 text-xs font-black ${
+                      firebaseConnected
+                        ? "bg-green-50 text-green-600"
+                        : "bg-red-50 text-red-600"
+                    }`}
                   >
                     {firebaseConnected
                       ? "CONNECTED"
@@ -1168,6 +1420,7 @@ export default function ReportDashboard() {
               </tr>
 
               {/* MOWER */}
+
               <tr className="border-b border-gray-100">
                 <td className="px-6 py-5 font-black text-[#40513B]">
                   Mower
@@ -1184,7 +1437,26 @@ export default function ReportDashboard() {
                 </td>
               </tr>
 
+              {/* MODE */}
+
+              <tr className="border-b border-gray-100">
+                <td className="px-6 py-5 font-black text-[#40513B]">
+                  Mode
+                </td>
+
+                <td className="px-6 py-5 font-bold text-[#6D7C66]">
+                  {mode}
+                </td>
+
+                <td className="px-6 py-5">
+                  <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-600">
+                    LIVE
+                  </span>
+                </td>
+              </tr>
+
               {/* MOWING VOLTAGE */}
+
               <tr className="border-b border-gray-100">
                 <td className="px-6 py-5 font-black text-[#40513B]">
                   Mowing Battery Voltage
@@ -1206,6 +1478,7 @@ export default function ReportDashboard() {
               </tr>
 
               {/* MOWING CURRENT */}
+
               <tr className="border-b border-gray-100">
                 <td className="px-6 py-5 font-black text-[#40513B]">
                   Mowing Battery Current
@@ -1227,6 +1500,7 @@ export default function ReportDashboard() {
               </tr>
 
               {/* MOWING POWER */}
+
               <tr className="border-b border-gray-100">
                 <td className="px-6 py-5 font-black text-[#40513B]">
                   Mowing Battery Power
@@ -1248,6 +1522,7 @@ export default function ReportDashboard() {
               </tr>
 
               {/* MOWING PERCENTAGE */}
+
               <tr className="border-b border-gray-100">
                 <td className="px-6 py-5 font-black text-[#40513B]">
                   Mowing Battery Percentage
@@ -1269,6 +1544,7 @@ export default function ReportDashboard() {
               </tr>
 
               {/* MOWING STATUS */}
+
               <tr className="border-b border-gray-100">
                 <td className="px-6 py-5 font-black text-[#40513B]">
                   Mowing Battery Status
@@ -1280,20 +1556,127 @@ export default function ReportDashboard() {
 
                 <td className="px-6 py-5">
                   <span
-                    className={`
-                      rounded-full px-3 py-1.5
-                      text-xs font-black
-                      ${getBatteryStatusClass(
-                        mowingBattery.status
-                      )}
-                    `}
+                    className={`rounded-full px-3 py-1.5 text-xs font-black ${getBatteryStatusClass(
+                      mowingBattery.status
+                    )}`}
                   >
                     {mowingBattery.status}
                   </span>
                 </td>
               </tr>
 
+              {/* DRIVE VOLTAGE */}
+
+              <tr className="border-b border-gray-100">
+                <td className="px-6 py-5 font-black text-[#40513B]">
+                  Drive Battery Voltage
+                </td>
+
+                <td className="px-6 py-5 font-bold text-[#6D7C66]">
+                  {formatNumber(
+                    driveBattery.voltage,
+                    2
+                  )}{" "}
+                  V
+                </td>
+
+                <td className="px-6 py-5">
+                  <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-600">
+                    RECEIVED
+                  </span>
+                </td>
+              </tr>
+
+              {/* DRIVE CURRENT */}
+
+              <tr className="border-b border-gray-100">
+                <td className="px-6 py-5 font-black text-[#40513B]">
+                  Drive Battery Current
+                </td>
+
+                <td className="px-6 py-5 font-bold text-[#6D7C66]">
+                  {formatNumber(
+                    driveBattery.current,
+                    3
+                  )}{" "}
+                  A
+                </td>
+
+                <td className="px-6 py-5">
+                  <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-600">
+                    RECEIVED
+                  </span>
+                </td>
+              </tr>
+
+              {/* DRIVE POWER */}
+
+              <tr className="border-b border-gray-100">
+                <td className="px-6 py-5 font-black text-[#40513B]">
+                  Drive Battery Power
+                </td>
+
+                <td className="px-6 py-5 font-bold text-[#6D7C66]">
+                  {formatNumber(
+                    driveBattery.power,
+                    3
+                  )}{" "}
+                  W
+                </td>
+
+                <td className="px-6 py-5">
+                  <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-600">
+                    RECEIVED
+                  </span>
+                </td>
+              </tr>
+
+              {/* DRIVE PERCENTAGE */}
+
+              <tr className="border-b border-gray-100">
+                <td className="px-6 py-5 font-black text-[#40513B]">
+                  Drive Battery Percentage
+                </td>
+
+                <td className="px-6 py-5 font-bold text-[#6D7C66]">
+                  {formatNumber(
+                    driveBattery.percentage,
+                    1
+                  )}{" "}
+                  %
+                </td>
+
+                <td className="px-6 py-5">
+                  <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-600">
+                    RECEIVED
+                  </span>
+                </td>
+              </tr>
+
+              {/* DRIVE STATUS */}
+
+              <tr className="border-b border-gray-100">
+                <td className="px-6 py-5 font-black text-[#40513B]">
+                  Drive Battery Status
+                </td>
+
+                <td className="px-6 py-5 font-bold text-[#6D7C66]">
+                  {driveBattery.status}
+                </td>
+
+                <td className="px-6 py-5">
+                  <span
+                    className={`rounded-full px-3 py-1.5 text-xs font-black ${getBatteryStatusClass(
+                      driveBattery.status
+                    )}`}
+                  >
+                    {driveBattery.status}
+                  </span>
+                </td>
+              </tr>
+
               {/* DRIVE */}
+
               <tr className="border-b border-gray-100">
                 <td className="px-6 py-5 font-black text-[#40513B]">
                   Drive
@@ -1305,16 +1688,12 @@ export default function ReportDashboard() {
 
                 <td className="px-6 py-5">
                   <span
-                    className={`
-                      rounded-full px-3 py-1.5
-                      text-xs font-black
-                      ${
-                        driveCommand.toUpperCase() ===
-                        "ON"
-                          ? "bg-green-50 text-green-600"
-                          : "bg-gray-100 text-gray-500"
-                      }
-                    `}
+                    className={`rounded-full px-3 py-1.5 text-xs font-black ${
+                      driveCommand.toUpperCase() ===
+                      "ON"
+                        ? "bg-green-50 text-green-600"
+                        : "bg-gray-100 text-gray-500"
+                    }`}
                   >
                     {driveCommand}
                   </span>
@@ -1322,6 +1701,7 @@ export default function ReportDashboard() {
               </tr>
 
               {/* BLADES */}
+
               <tr className="border-b border-gray-100">
                 <td className="px-6 py-5 font-black text-[#40513B]">
                   Blades
@@ -1333,16 +1713,12 @@ export default function ReportDashboard() {
 
                 <td className="px-6 py-5">
                   <span
-                    className={`
-                      rounded-full px-3 py-1.5
-                      text-xs font-black
-                      ${
-                        bladeCommand.toUpperCase() ===
-                        "ON"
-                          ? "bg-green-50 text-green-600"
-                          : "bg-gray-100 text-gray-500"
-                      }
-                    `}
+                    className={`rounded-full px-3 py-1.5 text-xs font-black ${
+                      bladeCommand.toUpperCase() ===
+                      "ON"
+                        ? "bg-green-50 text-green-600"
+                        : "bg-gray-100 text-gray-500"
+                    }`}
                   >
                     {bladeCommand}
                   </span>
@@ -1350,7 +1726,8 @@ export default function ReportDashboard() {
               </tr>
 
               {/* MOVEMENT */}
-              <tr>
+
+              <tr className="border-b border-gray-100">
                 <td className="px-6 py-5 font-black text-[#40513B]">
                   Movement
                 </td>
@@ -1362,6 +1739,42 @@ export default function ReportDashboard() {
                 <td className="px-6 py-5">
                   <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-600">
                     LIVE
+                  </span>
+                </td>
+              </tr>
+
+              {/* STEERING */}
+
+              <tr className="border-b border-gray-100">
+                <td className="px-6 py-5 font-black text-[#40513B]">
+                  Steering
+                </td>
+
+                <td className="px-6 py-5 font-bold text-[#6D7C66]">
+                  {steeringCommand}
+                </td>
+
+                <td className="px-6 py-5">
+                  <span className="rounded-full bg-purple-50 px-3 py-1.5 text-xs font-black text-purple-600">
+                    LIVE
+                  </span>
+                </td>
+              </tr>
+
+              {/* AUTOMATIC */}
+
+              <tr>
+                <td className="px-6 py-5 font-black text-[#40513B]">
+                  Automatic
+                </td>
+
+                <td className="px-6 py-5 font-bold text-[#6D7C66]">
+                  {automaticCommand}
+                </td>
+
+                <td className="px-6 py-5">
+                  <span className="rounded-full bg-orange-50 px-3 py-1.5 text-xs font-black text-orange-600">
+                    {automaticStatus}
                   </span>
                 </td>
               </tr>
@@ -1386,32 +1799,26 @@ export default function ReportDashboard() {
             </p>
 
             <p className="text-[11px] font-medium text-[#6D7C66]">
-              Data is synchronized from Firebase
+              Data is synchronized
+              from Firebase
               Realtime Database.
             </p>
           </div>
         </div>
 
         <span
-          className={`
-            flex items-center gap-2
-            text-[10px] font-black uppercase tracking-widest
-            ${
-              firebaseConnected
-                ? "text-green-600"
-                : "text-red-600"
-            }
-          `}
+          className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${
+            firebaseConnected
+              ? "text-green-600"
+              : "text-red-600"
+          }`}
         >
           <span
-            className={`
-              h-2 w-2 animate-pulse rounded-full
-              ${
-                firebaseConnected
-                  ? "bg-green-500"
-                  : "bg-red-500"
-              }
-            `}
+            className={`h-2 w-2 animate-pulse rounded-full ${
+              firebaseConnected
+                ? "bg-green-500"
+                : "bg-red-500"
+            }`}
           />
 
           {firebaseConnected
