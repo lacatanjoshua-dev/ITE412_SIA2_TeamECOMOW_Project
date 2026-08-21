@@ -645,7 +645,7 @@ export default function AppLayout({
 
             {/* DESKTOP NAV */}
 
-            <nav className="hidden md:flex items-center gap-8 font-semibold text-sm">
+            <nav className="fixed bottom-4 left-0 right-0 z-50 px-4">
 
               <Link
                 to="/app"

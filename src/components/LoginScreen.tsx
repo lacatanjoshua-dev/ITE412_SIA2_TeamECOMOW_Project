@@ -3,6 +3,10 @@ import { useNavigate, Link } from "react-router-dom";
 import { ShieldCheck, UserPlus } from "lucide-react";
 import { motion } from "framer-motion";
 
+
+import {
+  Capacitor
+} from "@capacitor/core";
 import {
   signInWithPopup,
   setPersistence,

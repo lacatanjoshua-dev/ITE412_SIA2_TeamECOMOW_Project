@@ -5,17 +5,16 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
-  StopCircle,
-  Power,
   Wifi,
   WifiOff,
+  Video,
   VideoOff,
-  Lightbulb,
   RotateCw,
   CircleStop,
   ShieldAlert,
   Scissors,
   LockKeyhole,
+  Power,
 } from "lucide-react";
 
 import { auth, db, realtimeDb } from "../firebase";
@@ -94,21 +93,11 @@ const FIREBASE_PATHS = {
   cameraStatus:
     "ecomow/mower/camera/status",
 
-  ledCommand:
-    "ecomow/mower/led/command",
-
-  ledStatus:
-    "ecomow/mower/led/status",
+  // IMPORTANT:
+  // Camera URL will now come from Firebase.
+  cameraStreamUrl:
+    "ecomow/mower/camera/streamUrl",
 };
-
-// =====================================================
-// ESP32-CAM
-// =====================================================
-
-const ESP32_CAM_IP = "10.120.218.72";
-
-const ESP32_CAM_STREAM_URL =
-  `http://${ESP32_CAM_IP}/stream`;
 
 // =====================================================
 // COMPONENT
@@ -187,12 +176,14 @@ export default function ManualControlScreen() {
   const [cameraError, setCameraError] =
     useState(false);
 
-  // ===================================================
-  // LED
-  // ===================================================
-
-  const [ledActive, setLedActive] =
-    useState(false);
+  // IMPORTANT:
+  // No hardcoded ESP32-CAM IP anymore.
+  // This URL comes from Firebase:
+  //
+  // ecomow/mower/camera/streamUrl
+  //
+  const [cameraStreamUrl, setCameraStreamUrl] =
+    useState("");
 
   // ===================================================
   // ACTIVE CONTROL
@@ -202,7 +193,7 @@ export default function ManualControlScreen() {
     useState<Direction | null>(null);
 
   // ===================================================
-  // MOBILE / POINTER CONTROL
+  // POINTER CONTROL
   // ===================================================
 
   const activePointerRef =
@@ -283,7 +274,7 @@ export default function ManualControlScreen() {
   };
 
   // ===================================================
-  // FIREBASE CONNECTION STATUS
+  // CONNECTION STATUS
   // ===================================================
 
   useEffect(() => {
@@ -379,15 +370,6 @@ export default function ManualControlScreen() {
             setActiveControl(null);
 
           }
-
-        },
-
-        (error) => {
-
-          console.error(
-            "Drive status error:",
-            error
-          );
 
         }
       );
@@ -504,15 +486,6 @@ export default function ManualControlScreen() {
 
           }
 
-        },
-
-        (error) => {
-
-          console.error(
-            "Steering status error:",
-            error
-          );
-
         }
       );
 
@@ -548,15 +521,6 @@ export default function ManualControlScreen() {
 
           setBladesActive(
             status === "ON"
-          );
-
-        },
-
-        (error) => {
-
-          console.error(
-            "Blade status error:",
-            error
           );
 
         }
@@ -602,17 +566,7 @@ export default function ManualControlScreen() {
           );
 
           setAutomaticRunning(
-            normalizedStatus ===
-            "RUNNING"
-          );
-
-        },
-
-        (error) => {
-
-          console.error(
-            "Automatic status error:",
-            error
+            normalizedStatus === "RUNNING"
           );
 
         }
@@ -648,39 +602,53 @@ export default function ManualControlScreen() {
             status
           );
 
+          const normalizedStatus =
+            String(
+              status || ""
+            ).toUpperCase();
+
           if (
-            status === "OFF"
+            normalizedStatus === "OFF"
           ) {
 
             setCameraActive(false);
 
-          }
-
-          if (
-            status === "ON"
+          } else if (
+            normalizedStatus === "ON"
           ) {
 
             setCameraActive(true);
 
-          }
+          } else if (
+            normalizedStatus === "ONLINE"
+          ) {
 
-          if (
-            status === "FRONT"
+            setCameraActive(true);
+
+          } else if (
+            normalizedStatus === "FRONT"
           ) {
 
             setCameraActive(true);
             setCurrentCamera("front");
 
-          }
-
-          if (
-            status === "REAR"
+          } else if (
+            normalizedStatus === "REAR"
           ) {
 
             setCameraActive(true);
             setCurrentCamera("rear");
 
           }
+
+        },
+
+        (error) => {
+
+          console.error(
+            "Camera status error:",
+            error
+          );
 
         }
       );
@@ -690,34 +658,59 @@ export default function ManualControlScreen() {
   }, []);
 
   // ===================================================
-  // LED STATUS
+  // CAMERA STREAM URL
   // ===================================================
 
   useEffect(() => {
 
-    const ledStatusRef =
+    const cameraStreamRef =
       ref(
         realtimeDb,
-        FIREBASE_PATHS.ledStatus
+        FIREBASE_PATHS.cameraStreamUrl
       );
 
     const unsubscribe =
       onValue(
-        ledStatusRef,
+        cameraStreamRef,
 
         (snapshot) => {
 
-          const status =
+          const url =
             snapshot.val();
 
           console.log(
-            "LED Status:",
-            status
+            "Firebase Camera Stream URL:",
+            url
           );
 
-          setLedActive(
-            status === "ON"
+          if (
+            typeof url === "string" &&
+            url.trim() !== ""
+          ) {
+
+            setCameraStreamUrl(
+              url.trim()
+            );
+
+            setCameraError(false);
+
+          } else {
+
+            setCameraStreamUrl("");
+
+          }
+
+        },
+
+        (error) => {
+
+          console.error(
+            "Camera stream URL error:",
+            error
           );
+
+          setCameraStreamUrl("");
+          setCameraError(true);
 
         }
       );
@@ -845,10 +838,7 @@ export default function ManualControlScreen() {
           ),
         ]);
 
-      const success =
-        results.every(Boolean);
-
-      if (!success) {
+      if (!results.every(Boolean)) {
 
         throw new Error(
           "One or more drive shutdown commands failed."
@@ -982,7 +972,7 @@ export default function ManualControlScreen() {
   };
 
   // ===================================================
-  // FORWARD / BACKWARD
+  // MOVE MOWER
   // ===================================================
 
   const moveMower = async (
@@ -1033,16 +1023,11 @@ export default function ManualControlScreen() {
 
     setIsConnected(true);
 
-    console.log(
-      "Movement command sent:",
-      movement
-    );
-
     return true;
   };
 
   // ===================================================
-  // LEFT / RIGHT
+  // STEER MOWER
   // ===================================================
 
   const steerMower = async (
@@ -1100,11 +1085,6 @@ export default function ManualControlScreen() {
 
     setIsConnected(true);
 
-    console.log(
-      "Steering command sent:",
-      steering
-    );
-
     return true;
   };
 
@@ -1135,9 +1115,7 @@ export default function ManualControlScreen() {
           ),
         ]);
 
-      if (
-        !results.every(Boolean)
-      ) {
+      if (!results.every(Boolean)) {
 
         throw new Error(
           "Movement stop command failed."
@@ -1153,10 +1131,6 @@ export default function ManualControlScreen() {
         null;
 
       setIsConnected(true);
-
-      console.log(
-        "Movement and steering stopped."
-      );
 
     } catch (error) {
 
@@ -1174,7 +1148,7 @@ export default function ManualControlScreen() {
   };
 
   // ===================================================
-  // DIRECTIONAL BUTTON START
+  // START DIRECTIONAL CONTROL
   // ===================================================
 
   const startDirectionalControl =
@@ -1208,10 +1182,8 @@ export default function ManualControlScreen() {
       );
 
       if (
-        directionValue ===
-          "forward" ||
-        directionValue ===
-          "backward"
+        directionValue === "forward" ||
+        directionValue === "backward"
       ) {
 
         await moveMower(
@@ -1219,8 +1191,7 @@ export default function ManualControlScreen() {
         );
 
       } else if (
-        directionValue ===
-        "left"
+        directionValue === "left"
       ) {
 
         await steerMower(
@@ -1228,8 +1199,7 @@ export default function ManualControlScreen() {
         );
 
       } else if (
-        directionValue ===
-        "right"
+        directionValue === "right"
       ) {
 
         await steerMower(
@@ -1240,7 +1210,7 @@ export default function ManualControlScreen() {
     };
 
   // ===================================================
-  // DIRECTIONAL BUTTON RELEASE
+  // RELEASE DIRECTIONAL CONTROL
   // ===================================================
 
   const releaseDirectionalControl =
@@ -1302,7 +1272,7 @@ export default function ManualControlScreen() {
   };
 
   // ===================================================
-  // CAMERA ON/OFF
+  // CAMERA POWER
   // ===================================================
 
   const toggleCameraPower =
@@ -1344,68 +1314,12 @@ export default function ManualControlScreen() {
     };
 
   // ===================================================
-  // LED
-  // ===================================================
-
-  const toggleLED = async () => {
-
-    const newLEDState =
-      !ledActive;
-
-    const success =
-      await writeCommand(
-        FIREBASE_PATHS.ledCommand,
-        newLEDState
-          ? "ON"
-          : "OFF"
-      );
-
-    if (!success) {
-      return;
-    }
-
-    setLedActive(
-      newLEDState
-    );
-
-    setIsConnected(true);
-
-    await createNotification(
-      `LED ${
-        newLEDState
-          ? "ON"
-          : "OFF"
-      }`,
-
-      `Manual LED control turned ${
-        newLEDState
-          ? "on"
-          : "off"
-      }.`,
-
-      "system"
-    );
-  };
-
-  // ===================================================
   // EMERGENCY STOP
   // ===================================================
 
   const stopMower = async () => {
 
     try {
-
-      console.log(
-        "================================"
-      );
-
-      console.log(
-        "EMERGENCY STOP"
-      );
-
-      console.log(
-        "================================"
-      );
 
       activePointerRef.current =
         null;
@@ -1441,9 +1355,7 @@ export default function ManualControlScreen() {
           ),
         ]);
 
-      if (
-        !results.every(Boolean)
-      ) {
+      if (!results.every(Boolean)) {
 
         throw new Error(
           "One or more emergency stop commands failed."
@@ -1543,19 +1455,15 @@ export default function ManualControlScreen() {
 
         </div>
 
-        {/* CONNECTION */}
-
         <div
           className={`flex items-center gap-3 rounded-2xl border px-5 py-2.5 shadow-sm ${
-            isConnected &&
-            mowerOnline
+            isConnected && mowerOnline
               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800"
               : "border-rose-200 bg-rose-50 text-rose-600"
           }`}
         >
 
-          {isConnected &&
-          mowerOnline ? (
+          {isConnected && mowerOnline ? (
 
             <>
 
@@ -1633,79 +1541,99 @@ export default function ManualControlScreen() {
 
             <div className="relative aspect-video overflow-hidden rounded-[2rem] bg-[#1A2118]">
 
+              {/* CAMERA FEED */}
+
               {cameraActive ? (
 
                 <div className="absolute inset-0 bg-black">
 
-                  {/* ========================================= */}
-                  {/* ESP32-CAM LIVE STREAM */}
-                  {/* ========================================= */}
-
-                  {!cameraError ? (
+                  {cameraStreamUrl &&
+                  !cameraError ? (
 
                     <img
-                      src={ESP32_CAM_STREAM_URL}
+                      key={`${currentCamera}-${cameraActive}-${cameraStreamUrl}`}
+                      src={cameraStreamUrl}
                       alt="ESP32-CAM Live Feed"
-                      className="h-full w-full object-cover"
+                      className="absolute inset-0 h-full w-full object-cover"
                       onLoad={() => {
+
                         console.log(
-                          "ESP32-CAM stream connected."
+                          "ESP32-CAM stream connected:",
+                          cameraStreamUrl
                         );
 
                         setCameraError(false);
+
                       }}
                       onError={() => {
+
                         console.error(
                           "ESP32-CAM stream failed:",
-                          ESP32_CAM_STREAM_URL
+                          cameraStreamUrl
                         );
 
                         setCameraError(true);
+
                       }}
                     />
 
                   ) : (
 
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#101510] px-6 text-center">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#101510] px-6 text-center">
 
-                      <VideoOff className="h-12 w-12 text-red-400" />
+                      <VideoOff className="mb-4 h-14 w-14 text-red-400" />
 
-                      <div>
+                      <p className="text-sm font-black uppercase tracking-wider text-white">
+                        Camera Stream Unavailable
+                      </p>
 
-                        <p className="text-sm font-black uppercase tracking-wider text-white">
-                          ESP32-CAM Offline
+                      <p className="mt-2 text-[10px] font-medium text-white/50">
+                        Waiting for the ESP32-CAM internet stream...
+                      </p>
+
+                      {!cameraStreamUrl && (
+
+                        <p className="mt-3 rounded-lg bg-black/40 px-3 py-2 text-[10px] text-amber-400">
+                          No stream URL available in Firebase.
                         </p>
 
-                        <p className="mt-2 text-[10px] font-medium text-white/50">
-                          Cannot connect to:
+                      )}
+
+                      {cameraStreamUrl && (
+
+                        <p className="mt-3 max-w-full break-all rounded-lg bg-black/40 px-3 py-2 font-mono text-[10px] text-emerald-400">
+                          {cameraStreamUrl}
                         </p>
 
-                        <p className="mt-1 break-all font-mono text-[10px] text-emerald-400">
-                          {ESP32_CAM_STREAM_URL}
-                        </p>
+                      )}
 
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+
+                          setCameraError(false);
+
+                        }}
+                        className="mt-4 rounded-xl bg-emerald-600 px-4 py-2 text-[10px] font-black uppercase text-white hover:bg-emerald-700"
+                      >
+                        Retry Camera
+                      </button>
 
                     </div>
 
                   )}
 
-                  {/* ========================================= */}
                   {/* LIVE INDICATOR */}
-                  {/* ========================================= */}
 
-                  {!cameraError && (
+                  {!cameraError &&
+                  cameraStreamUrl && (
 
-                    <div className="absolute left-4 top-4 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/80 px-3 py-1.5 shadow-lg backdrop-blur-md">
+                    <div className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/80 px-3 py-1.5 shadow-lg backdrop-blur-md">
 
                       <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
 
                       <span className="text-[10px] font-black uppercase tracking-widest text-emerald-300">
-
-                        Live Feed (
-                        {currentCamera.toUpperCase()}
-                        )
-
+                        Live Feed ({currentCamera.toUpperCase()})
                       </span>
 
                     </div>
@@ -1716,21 +1644,27 @@ export default function ManualControlScreen() {
 
               ) : (
 
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/40">
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#101510] text-white/40">
 
-                  <VideoOff className="h-12 w-12" />
+                  <VideoOff className="h-14 w-14" />
 
                   <span className="text-xs font-bold uppercase tracking-wider">
-                    Camera Offline
+                    Camera OFF
+                  </span>
+
+                  <span className="text-[10px] text-white/30">
+                    Turn on the camera to view the feed.
                   </span>
 
                 </div>
 
               )}
 
+              {/* DIRECTION */}
+
               {direction && (
 
-                <div className="absolute right-4 top-4 animate-pulse rounded-xl border border-emerald-400/40 bg-emerald-600/90 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg backdrop-blur-md">
+                <div className="absolute right-4 top-4 z-20 animate-pulse rounded-xl border border-emerald-400/40 bg-emerald-600/90 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg backdrop-blur-md">
 
                   {direction} Active
 
@@ -1738,57 +1672,107 @@ export default function ManualControlScreen() {
 
               )}
 
+              {/* ================================================= */}
               {/* CAMERA CONTROLS */}
+              {/* ================================================= */}
 
-              <div className="absolute bottom-4 left-1/2 z-30 flex w-auto max-w-[95%] -translate-x-1/2 flex-wrap justify-center gap-2">
+              <div
+                className="
+                  absolute
+                  bottom-4
+                  left-1/2
+                  z-[100]
+                  flex
+                  w-[calc(100%-1rem)]
+                  max-w-[620px]
+                  -translate-x-1/2
+                  flex-wrap
+                  items-center
+                  justify-center
+                  gap-2
+                  rounded-2xl
+                  bg-black/30
+                  p-2
+                  backdrop-blur-sm
+                "
+              >
+
+                {/* SWITCH CAMERA */}
 
                 <button
                   type="button"
                   onClick={toggleCamera}
-                  className="flex min-h-11 touch-manipulation select-none items-center gap-2 rounded-xl border border-white/10 bg-black/60 px-4 py-2.5 text-xs font-bold text-white shadow-lg backdrop-blur-md transition hover:bg-black/80 active:scale-95"
+                  className="
+                    flex
+                    min-h-11
+                    touch-manipulation
+                    select-none
+                    items-center
+                    gap-2
+                    rounded-xl
+                    border
+                    border-white/20
+                    bg-black/80
+                    px-4
+                    py-2.5
+                    text-xs
+                    font-black
+                    text-white
+                    shadow-lg
+                    backdrop-blur-md
+                    transition
+                    hover:bg-black
+                    active:scale-95
+                  "
                 >
 
-                  <RotateCw className="h-3.5 w-3.5 text-emerald-400" />
+                  <RotateCw className="h-4 w-4 text-emerald-400" />
 
-                  {currentCamera} Cam
+                  {currentCamera === "front"
+                    ? "REAR CAM"
+                    : "FRONT CAM"}
 
                 </button>
+
+                {/* CAMERA POWER */}
 
                 <button
                   type="button"
                   onClick={toggleCameraPower}
-                  className="flex min-h-11 touch-manipulation select-none items-center gap-2 rounded-xl border border-white/10 bg-black/60 px-4 py-2.5 text-xs font-bold text-white shadow-lg backdrop-blur-md transition hover:bg-black/80 active:scale-95"
+                  className={`
+                    flex
+                    min-h-11
+                    touch-manipulation
+                    select-none
+                    items-center
+                    gap-2
+                    rounded-xl
+                    border
+                    px-4
+                    py-2.5
+                    text-xs
+                    font-black
+                    text-white
+                    shadow-lg
+                    backdrop-blur-md
+                    transition
+                    active:scale-95
+                    ${
+                      cameraActive
+                        ? "border-emerald-400/40 bg-emerald-700/90 hover:bg-emerald-800"
+                        : "border-red-400/40 bg-red-700/90 hover:bg-red-800"
+                    }
+                  `}
                 >
 
-                  <VideoOff className="h-3.5 w-3.5 text-gray-300" />
+                  {cameraActive ? (
+                    <Video className="h-4 w-4" />
+                  ) : (
+                    <VideoOff className="h-4 w-4" />
+                  )}
 
-                  Camera{" "}
+                  CAMERA{" "}
                   {cameraActive
-                    ? "ON"
-                    : "OFF"}
-
-                </button>
-
-                <button
-                  type="button"
-                  onClick={toggleLED}
-                  className={`flex min-h-11 touch-manipulation select-none items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-bold shadow-lg backdrop-blur-md transition active:scale-95 ${
-                    ledActive
-                      ? "border-amber-300/50 bg-amber-500/80 text-white"
-                      : "border-white/10 bg-black/60 text-white hover:bg-black/80"
-                  }`}
-                >
-
-                  <Lightbulb
-                    className={`h-3.5 w-3.5 ${
-                      ledActive
-                        ? "fill-amber-200 text-amber-200"
-                        : "text-gray-400"
-                    }`}
-                  />
-
-                  Lamp{" "}
-                  {ledActive
                     ? "ON"
                     : "OFF"}
 
@@ -1822,17 +1806,12 @@ export default function ManualControlScreen() {
 
             </div>
 
-            {/* CONTROL PAD */}
-
             <div
               className="relative z-40 flex h-64 w-64 items-center justify-center sm:h-72 sm:w-72"
               style={{
-                touchAction:
-                  "none",
-                userSelect:
-                  "none",
-                WebkitUserSelect:
-                  "none",
+                touchAction: "none",
+                userSelect: "none",
+                WebkitUserSelect: "none",
               }}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -1851,23 +1830,19 @@ export default function ManualControlScreen() {
                 }
                 aria-label="Move forward"
                 className={`pointer-events-auto absolute top-2 z-50 flex h-16 w-16 touch-none select-none items-center justify-center rounded-2xl border shadow-md transition-all active:scale-95 sm:h-20 sm:w-20 ${
-                  activeControl ===
-                  "forward"
-                    ? "border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
-                    : "border-slate-200 bg-white text-[#2C3627] hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-lg"
+                  activeControl === "forward"
+                    ? "border-emerald-500 bg-emerald-500 text-white"
+                    : "border-slate-200 bg-white text-[#2C3627]"
                 } ${
                   !driveActive ||
                   automaticRunning
-                    ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300 opacity-50"
+                    ? "cursor-not-allowed opacity-50"
                     : "cursor-pointer"
                 }`}
                 style={{
-                  touchAction:
-                    "none",
+                  touchAction: "none",
                 }}
-                onPointerDown={async (
-                  e
-                ) => {
+                onPointerDown={async (e) => {
 
                   e.preventDefault();
                   e.stopPropagation();
@@ -1880,22 +1855,17 @@ export default function ManualControlScreen() {
                   }
 
                   try {
-
                     e.currentTarget.setPointerCapture(
                       e.pointerId
                     );
-
                   } catch {}
 
                   await startDirectionalControl(
                     "forward",
                     e.pointerId
                   );
-
                 }}
-                onPointerUp={async (
-                  e
-                ) => {
+                onPointerUp={async (e) => {
 
                   e.preventDefault();
                   e.stopPropagation();
@@ -1919,11 +1889,8 @@ export default function ManualControlScreen() {
                   await releaseDirectionalControl(
                     e.pointerId
                   );
-
                 }}
-                onPointerCancel={async (
-                  e
-                ) => {
+                onPointerCancel={async (e) => {
 
                   e.preventDefault();
                   e.stopPropagation();
@@ -1931,19 +1898,6 @@ export default function ManualControlScreen() {
                   await releaseDirectionalControl(
                     e.pointerId
                   );
-
-                }}
-                onLostPointerCapture={async () => {
-
-                  if (
-                    activePointerRef.current !==
-                    null
-                  ) {
-
-                    await releaseDirectionalControl();
-
-                  }
-
                 }}
               >
 
@@ -1964,23 +1918,19 @@ export default function ManualControlScreen() {
                 }
                 aria-label="Steer right"
                 className={`pointer-events-auto absolute right-2 z-50 flex h-16 w-16 touch-none select-none items-center justify-center rounded-2xl border shadow-md transition-all active:scale-95 sm:h-20 sm:w-20 ${
-                  activeControl ===
-                  "right"
-                    ? "border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
-                    : "border-slate-200 bg-white text-[#2C3627] hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-lg"
+                  activeControl === "right"
+                    ? "border-emerald-500 bg-emerald-500 text-white"
+                    : "border-slate-200 bg-white text-[#2C3627]"
                 } ${
                   !driveActive ||
                   automaticRunning
-                    ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300 opacity-50"
+                    ? "cursor-not-allowed opacity-50"
                     : "cursor-pointer"
                 }`}
                 style={{
-                  touchAction:
-                    "none",
+                  touchAction: "none",
                 }}
-                onPointerDown={async (
-                  e
-                ) => {
+                onPointerDown={async (e) => {
 
                   e.preventDefault();
                   e.stopPropagation();
@@ -1993,50 +1943,17 @@ export default function ManualControlScreen() {
                   }
 
                   try {
-
                     e.currentTarget.setPointerCapture(
                       e.pointerId
                     );
-
                   } catch {}
 
                   await startDirectionalControl(
                     "right",
                     e.pointerId
                   );
-
                 }}
-                onPointerUp={async (
-                  e
-                ) => {
-
-                  e.preventDefault();
-                  e.stopPropagation();
-
-                  try {
-
-                    if (
-                      e.currentTarget.hasPointerCapture(
-                        e.pointerId
-                      )
-                    ) {
-
-                      e.currentTarget.releasePointerCapture(
-                        e.pointerId
-                      );
-
-                    }
-
-                  } catch {}
-
-                  await releaseDirectionalControl(
-                    e.pointerId
-                  );
-
-                }}
-                onPointerCancel={async (
-                  e
-                ) => {
+                onPointerUp={async (e) => {
 
                   e.preventDefault();
                   e.stopPropagation();
@@ -2044,19 +1961,15 @@ export default function ManualControlScreen() {
                   await releaseDirectionalControl(
                     e.pointerId
                   );
-
                 }}
-                onLostPointerCapture={async () => {
+                onPointerCancel={async (e) => {
 
-                  if (
-                    activePointerRef.current !==
-                    null
-                  ) {
+                  e.preventDefault();
+                  e.stopPropagation();
 
-                    await releaseDirectionalControl();
-
-                  }
-
+                  await releaseDirectionalControl(
+                    e.pointerId
+                  );
                 }}
               >
 
@@ -2077,23 +1990,19 @@ export default function ManualControlScreen() {
                 }
                 aria-label="Move backward"
                 className={`pointer-events-auto absolute bottom-2 z-50 flex h-16 w-16 touch-none select-none items-center justify-center rounded-2xl border shadow-md transition-all active:scale-95 sm:h-20 sm:w-20 ${
-                  activeControl ===
-                  "backward"
-                    ? "border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
-                    : "border-slate-200 bg-white text-[#2C3627] hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-lg"
+                  activeControl === "backward"
+                    ? "border-emerald-500 bg-emerald-500 text-white"
+                    : "border-slate-200 bg-white text-[#2C3627]"
                 } ${
                   !driveActive ||
                   automaticRunning
-                    ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300 opacity-50"
+                    ? "cursor-not-allowed opacity-50"
                     : "cursor-pointer"
                 }`}
                 style={{
-                  touchAction:
-                    "none",
+                  touchAction: "none",
                 }}
-                onPointerDown={async (
-                  e
-                ) => {
+                onPointerDown={async (e) => {
 
                   e.preventDefault();
                   e.stopPropagation();
@@ -2106,50 +2015,17 @@ export default function ManualControlScreen() {
                   }
 
                   try {
-
                     e.currentTarget.setPointerCapture(
                       e.pointerId
                     );
-
                   } catch {}
 
                   await startDirectionalControl(
                     "backward",
                     e.pointerId
                   );
-
                 }}
-                onPointerUp={async (
-                  e
-                ) => {
-
-                  e.preventDefault();
-                  e.stopPropagation();
-
-                  try {
-
-                    if (
-                      e.currentTarget.hasPointerCapture(
-                        e.pointerId
-                      )
-                    ) {
-
-                      e.currentTarget.releasePointerCapture(
-                        e.pointerId
-                      );
-
-                    }
-
-                  } catch {}
-
-                  await releaseDirectionalControl(
-                    e.pointerId
-                  );
-
-                }}
-                onPointerCancel={async (
-                  e
-                ) => {
+                onPointerUp={async (e) => {
 
                   e.preventDefault();
                   e.stopPropagation();
@@ -2157,19 +2033,15 @@ export default function ManualControlScreen() {
                   await releaseDirectionalControl(
                     e.pointerId
                   );
-
                 }}
-                onLostPointerCapture={async () => {
+                onPointerCancel={async (e) => {
 
-                  if (
-                    activePointerRef.current !==
-                    null
-                  ) {
+                  e.preventDefault();
+                  e.stopPropagation();
 
-                    await releaseDirectionalControl();
-
-                  }
-
+                  await releaseDirectionalControl(
+                    e.pointerId
+                  );
                 }}
               >
 
@@ -2190,23 +2062,19 @@ export default function ManualControlScreen() {
                 }
                 aria-label="Steer left"
                 className={`pointer-events-auto absolute left-2 z-50 flex h-16 w-16 touch-none select-none items-center justify-center rounded-2xl border shadow-md transition-all active:scale-95 sm:h-20 sm:w-20 ${
-                  activeControl ===
-                  "left"
-                    ? "border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
-                    : "border-slate-200 bg-white text-[#2C3627] hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-lg"
+                  activeControl === "left"
+                    ? "border-emerald-500 bg-emerald-500 text-white"
+                    : "border-slate-200 bg-white text-[#2C3627]"
                 } ${
                   !driveActive ||
                   automaticRunning
-                    ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300 opacity-50"
+                    ? "cursor-not-allowed opacity-50"
                     : "cursor-pointer"
                 }`}
                 style={{
-                  touchAction:
-                    "none",
+                  touchAction: "none",
                 }}
-                onPointerDown={async (
-                  e
-                ) => {
+                onPointerDown={async (e) => {
 
                   e.preventDefault();
                   e.stopPropagation();
@@ -2219,50 +2087,17 @@ export default function ManualControlScreen() {
                   }
 
                   try {
-
                     e.currentTarget.setPointerCapture(
                       e.pointerId
                     );
-
                   } catch {}
 
                   await startDirectionalControl(
                     "left",
                     e.pointerId
                   );
-
                 }}
-                onPointerUp={async (
-                  e
-                ) => {
-
-                  e.preventDefault();
-                  e.stopPropagation();
-
-                  try {
-
-                    if (
-                      e.currentTarget.hasPointerCapture(
-                        e.pointerId
-                      )
-                    ) {
-
-                      e.currentTarget.releasePointerCapture(
-                        e.pointerId
-                      );
-
-                    }
-
-                  } catch {}
-
-                  await releaseDirectionalControl(
-                    e.pointerId
-                  );
-
-                }}
-                onPointerCancel={async (
-                  e
-                ) => {
+                onPointerUp={async (e) => {
 
                   e.preventDefault();
                   e.stopPropagation();
@@ -2270,19 +2105,15 @@ export default function ManualControlScreen() {
                   await releaseDirectionalControl(
                     e.pointerId
                   );
-
                 }}
-                onLostPointerCapture={async () => {
+                onPointerCancel={async (e) => {
 
-                  if (
-                    activePointerRef.current !==
-                    null
-                  ) {
+                  e.preventDefault();
+                  e.stopPropagation();
 
-                    await releaseDirectionalControl();
-
-                  }
-
+                  await releaseDirectionalControl(
+                    e.pointerId
+                  );
                 }}
               >
 
@@ -2298,9 +2129,9 @@ export default function ManualControlScreen() {
               <div className="pointer-events-none relative z-20 flex h-16 w-16 items-center justify-center rounded-full border border-slate-200 bg-slate-100 shadow-inner sm:h-20 sm:w-20">
 
                 <div
-                  className={`h-6 w-6 rounded-full transition-all duration-300 ${
+                  className={`h-6 w-6 rounded-full ${
                     driveActive
-                      ? "animate-pulse bg-emerald-500 shadow-lg shadow-emerald-500/40"
+                      ? "animate-pulse bg-emerald-500"
                       : "bg-slate-300"
                   }`}
                 />
@@ -2309,7 +2140,7 @@ export default function ManualControlScreen() {
 
             </div>
 
-            {/* CURRENT COMMAND */}
+            {/* COMMAND STATUS */}
 
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
 
@@ -2324,8 +2155,7 @@ export default function ManualControlScreen() {
                     : "bg-slate-100 text-slate-600"
                 }`}
               >
-                {direction ||
-                  "STOP"}
+                {direction || "STOP"}
               </span>
 
               <span className="text-[10px] font-semibold text-slate-400">
@@ -2334,8 +2164,7 @@ export default function ManualControlScreen() {
 
               <span
                 className={`rounded-full px-3 py-1 text-[10px] font-black uppercase ${
-                  steeringStatus !==
-                  "STOP"
+                  steeringStatus !== "STOP"
                     ? "bg-emerald-100 text-emerald-700"
                     : "bg-slate-100 text-slate-600"
                 }`}
@@ -2344,8 +2173,6 @@ export default function ManualControlScreen() {
               </span>
 
             </div>
-
-            {/* CONTROL STATUS */}
 
             <div className="mt-4 text-center">
 
@@ -2393,7 +2220,7 @@ export default function ManualControlScreen() {
 
             <div className="mb-5 flex items-center gap-3">
 
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-600 shadow-lg shadow-red-600/30">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-600">
 
                 <ShieldAlert
                   className="h-6 w-6 text-white"
@@ -2415,8 +2242,6 @@ export default function ManualControlScreen() {
               </div>
 
             </div>
-
-            {/* WARNING */}
 
             <div className="mb-5 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4">
 
@@ -2441,8 +2266,6 @@ export default function ManualControlScreen() {
 
             </div>
 
-            {/* BIG RED EMERGENCY BUTTON */}
-
             <button
               type="button"
               onClick={stopMower}
@@ -2466,46 +2289,18 @@ export default function ManualControlScreen() {
                 px-6
                 py-7
                 text-white
-                shadow-[0_10px_35px_rgba(220,38,38,0.35)]
+                shadow-lg
                 transition-all
-                duration-200
                 hover:bg-red-700
                 active:scale-[0.97]
-                active:bg-red-800
-                focus:outline-none
-                focus:ring-4
-                focus:ring-red-300
               "
             >
 
-              <div
-                className="
-                  absolute
-                  inset-0
-                  animate-pulse
-                  bg-red-500/20
-                "
-              />
+              <div className="absolute inset-0 animate-pulse bg-red-500/20" />
 
-              <div
-                className="
-                  relative
-                  z-10
-                  flex
-                  h-16
-                  w-16
-                  shrink-0
-                  items-center
-                  justify-center
-                  rounded-full
-                  border-4
-                  border-white
-                  bg-red-700
-                  shadow-lg
-                "
-              >
+              <div className="relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-4 border-white bg-red-700">
 
-                <StopCircle
+                <CircleStop
                   className="h-9 w-9 text-white"
                   strokeWidth={2.5}
                 />
@@ -2518,11 +2313,11 @@ export default function ManualControlScreen() {
                   Emergency
                 </p>
 
-                <p className="mt-0.5 text-xl font-black uppercase tracking-wider text-white sm:text-2xl">
+                <p className="text-xl font-black uppercase tracking-wider text-white sm:text-2xl">
                   STOP
                 </p>
 
-                <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-red-100">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-red-100">
                   Stop all mower systems
                 </p>
 
@@ -2530,78 +2325,13 @@ export default function ManualControlScreen() {
 
             </button>
 
-            {/* STATUS INDICATOR */}
-
             <div className="mt-5 flex items-center justify-center gap-2">
 
-              <span
-                className="
-                  h-2.5
-                  w-2.5
-                  animate-pulse
-                  rounded-full
-                  bg-red-500
-                  shadow-[0_0_10px_rgba(239,68,68,0.8)]
-                "
-              />
+              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
 
               <span className="text-[9px] font-black uppercase tracking-[2px] text-red-600">
                 Emergency Stop Ready
               </span>
-
-            </div>
-
-            {/* SYSTEMS THAT WILL STOP */}
-
-            <div className="mt-5 grid grid-cols-2 gap-2">
-
-              <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5">
-
-                <p className="text-[8px] font-black uppercase tracking-wider text-red-400">
-                  Drive
-                </p>
-
-                <p className="mt-0.5 text-[10px] font-black text-red-700">
-                  OFF
-                </p>
-
-              </div>
-
-              <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5">
-
-                <p className="text-[8px] font-black uppercase tracking-wider text-red-400">
-                  Blades
-                </p>
-
-                <p className="mt-0.5 text-[10px] font-black text-red-700">
-                  OFF
-                </p>
-
-              </div>
-
-              <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5">
-
-                <p className="text-[8px] font-black uppercase tracking-wider text-red-400">
-                  Steering
-                </p>
-
-                <p className="mt-0.5 text-[10px] font-black text-red-700">
-                  STOP
-                </p>
-
-              </div>
-
-              <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5">
-
-                <p className="text-[8px] font-black uppercase tracking-wider text-red-400">
-                  Automatic
-                </p>
-
-                <p className="mt-0.5 text-[10px] font-black text-red-700">
-                  STOP
-                </p>
-
-              </div>
 
             </div>
 
@@ -2637,18 +2367,16 @@ export default function ManualControlScreen() {
 
               <button
                 type="button"
-                onClick={
-                  engageDrive
-                }
+                onClick={engageDrive}
                 disabled={
                   driveActive ||
                   automaticRunning
                 }
-                className={`relative z-30 flex min-h-14 w-full touch-manipulation items-center justify-center gap-2 rounded-2xl py-4 text-sm font-black tracking-wide transition-all ${
+                className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-black ${
                   driveActive ||
                   automaticRunning
                     ? "cursor-not-allowed bg-[#40513B] text-white opacity-40"
-                    : "cursor-pointer bg-[#40513B] text-white shadow-md shadow-[#40513B]/20 hover:bg-[#2C3627] active:scale-[0.98]"
+                    : "bg-[#40513B] text-white hover:bg-[#2C3627]"
                 }`}
               >
 
@@ -2660,16 +2388,12 @@ export default function ManualControlScreen() {
 
               <button
                 type="button"
-                onClick={
-                  disengageDrive
-                }
-                disabled={
+                onClick={disengageDrive}
+                disabled={!driveActive}
+                className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border py-4 text-sm font-black ${
                   !driveActive
-                }
-                className={`relative z-30 flex min-h-14 w-full touch-manipulation items-center justify-center gap-2 rounded-2xl border py-4 text-sm font-black tracking-wide transition-all ${
-                  !driveActive
-                    ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300 opacity-60"
-                    : "cursor-pointer border-slate-200 bg-white text-[#2C3627] hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 active:scale-[0.98]"
+                    ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"
+                    : "border-slate-200 bg-white text-[#2C3627] hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
                 }`}
               >
 
@@ -2678,18 +2402,6 @@ export default function ManualControlScreen() {
                 DISENGAGE DRIVE
 
               </button>
-
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-
-              <p className="text-[8px] font-black uppercase tracking-[1.5px] text-slate-400">
-                Firebase Drive Path
-              </p>
-
-              <p className="mt-1 break-all font-mono text-[9px] text-slate-600">
-                /ecomow/mower/drive/command
-              </p>
 
             </div>
 
@@ -2727,7 +2439,7 @@ export default function ManualControlScreen() {
 
                 <div className="mb-3 flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
 
-                  <ShieldAlert className="h-4 w-4 shrink-0 text-[#40513B]" />
+                  <ShieldAlert className="h-4 w-4 text-[#40513B]" />
 
                   <div>
 
@@ -2735,7 +2447,7 @@ export default function ManualControlScreen() {
                       Drive Required
                     </p>
 
-                    <p className="text-[9px] font-medium text-slate-400">
+                    <p className="text-[9px] text-slate-400">
                       Engage the drive before starting the cutting blades.
                     </p>
 
@@ -2749,7 +2461,7 @@ export default function ManualControlScreen() {
 
               <div className="mb-3 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5">
 
-                <LockKeyhole className="h-4 w-4 shrink-0 text-amber-600" />
+                <LockKeyhole className="h-4 w-4 text-amber-600" />
 
                 <div>
 
@@ -2757,7 +2469,7 @@ export default function ManualControlScreen() {
                     Manual Control Locked
                   </p>
 
-                  <p className="text-[9px] font-medium text-amber-600">
+                  <p className="text-[9px] text-amber-600">
                     Automatic mode currently controls the mower.
                   </p>
 
@@ -2769,20 +2481,18 @@ export default function ManualControlScreen() {
 
             <button
               type="button"
-              onClick={
-                engageBlades
-              }
+              onClick={engageBlades}
               disabled={
                 bladesActive ||
                 automaticRunning ||
                 !driveActive
               }
-              className={`relative z-30 flex min-h-14 w-full touch-manipulation items-center justify-center gap-3 rounded-2xl py-4 text-sm font-black tracking-wider transition-all duration-200 ${
+              className={`flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl py-4 text-sm font-black ${
                 bladesActive ||
                 automaticRunning ||
                 !driveActive
                   ? "cursor-not-allowed bg-[#40513B] text-white opacity-40"
-                  : "cursor-pointer bg-[#40513B] text-white shadow-md shadow-[#40513B]/20 hover:bg-[#2C3627] hover:shadow-lg active:scale-[0.98]"
+                  : "bg-[#40513B] text-white hover:bg-[#2C3627]"
               }`}
             >
 
@@ -2794,16 +2504,12 @@ export default function ManualControlScreen() {
 
             <button
               type="button"
-              onClick={
-                disengageBlades
-              }
-              disabled={
+              onClick={disengageBlades}
+              disabled={!bladesActive}
+              className={`mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border py-4 text-sm font-black ${
                 !bladesActive
-              }
-              className={`relative z-30 mt-3 flex min-h-14 w-full touch-manipulation items-center justify-center gap-2 rounded-2xl border py-4 text-sm font-black tracking-wide transition-all ${
-                !bladesActive
-                  ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300 opacity-60"
-                  : "cursor-pointer border-slate-200 bg-white text-[#2C3627] hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 active:scale-[0.98]"
+                  ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"
+                  : "border-slate-200 bg-white text-[#2C3627] hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
               }`}
             >
 
@@ -2812,32 +2518,6 @@ export default function ManualControlScreen() {
               DISENGAGE BLADES
 
             </button>
-
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-
-              <div className="flex items-center justify-between">
-
-                <p className="text-[8px] font-black uppercase tracking-[1.5px] text-slate-400">
-                  Firebase Blade Path
-                </p>
-
-                <span className="rounded-full bg-white px-2 py-1 text-[8px] font-black uppercase tracking-wider text-slate-400">
-                  REALTIME
-                </span>
-
-              </div>
-
-              <p className="mt-1 break-all font-mono text-[9px] text-slate-600">
-                /ecomow/mower/blades/command
-              </p>
-
-              <p className="mt-1 text-[8px] text-slate-400">
-                Status:
-                {" "}
-                /ecomow/mower/blades/status
-              </p>
-
-            </div>
 
           </div>
 
@@ -2860,8 +2540,6 @@ export default function ManualControlScreen() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-
-              {/* DRIVE */}
 
               <div
                 className={`rounded-2xl p-4 ${
@@ -2889,8 +2567,6 @@ export default function ManualControlScreen() {
 
               </div>
 
-              {/* BLADES */}
-
               <div
                 className={`rounded-2xl p-4 ${
                   bladesActive
@@ -2903,33 +2579,19 @@ export default function ManualControlScreen() {
                   Blades
                 </p>
 
-                <div className="mt-2 flex items-center gap-2">
-
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      bladesActive
-                        ? "animate-pulse bg-emerald-500"
-                        : "bg-slate-300"
-                    }`}
-                  />
-
-                  <p
-                    className={`text-lg font-black ${
-                      bladesActive
-                        ? "text-emerald-600"
-                        : "text-slate-500"
-                    }`}
-                  >
-                    {bladesActive
-                      ? "ON"
-                      : "OFF"}
-                  </p>
-
-                </div>
+                <p
+                  className={`mt-2 text-lg font-black ${
+                    bladesActive
+                      ? "text-emerald-600"
+                      : "text-slate-500"
+                  }`}
+                >
+                  {bladesActive
+                    ? "ON"
+                    : "OFF"}
+                </p>
 
               </div>
-
-              {/* STEERING */}
 
               <div className="rounded-2xl bg-slate-50 p-4">
 
@@ -2942,8 +2604,6 @@ export default function ManualControlScreen() {
                 </p>
 
               </div>
-
-              {/* AUTOMATIC */}
 
               <div
                 className={`rounded-2xl p-4 ${
@@ -2977,17 +2637,8 @@ export default function ManualControlScreen() {
 
       </div>
 
-      {/* ================================================= */}
-      {/* MOBILE BOTTOM SAFE AREA */}
-      {/* ================================================= */}
-
       <div
-        className="
-          pointer-events-none
-          h-8
-          w-full
-          sm:h-4
-        "
+        className="pointer-events-none h-8 w-full sm:h-4"
         aria-hidden="true"
       />
 
