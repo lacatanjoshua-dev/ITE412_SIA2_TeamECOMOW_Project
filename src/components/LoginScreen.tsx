@@ -26,7 +26,7 @@ import {
   db,
 } from "../firebase";
 
-const logoImage = "/images/logo.jpg";
+const logoImage = "/images/Ecomow.png";
 const grassBg = "/images/mower.jpg";
 
 interface LoginScreenProps {

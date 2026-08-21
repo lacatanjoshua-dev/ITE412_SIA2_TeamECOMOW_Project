@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 
-const logoImage = "/images/logo.jpg";
+const logoImage = "/images/Ecomow.png";
 const grassBg = "/images/grass.jpg"; 
 
 interface Mower {

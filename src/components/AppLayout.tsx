@@ -56,7 +56,7 @@ import {
 // IMAGES
 // =====================================================
 
-const logoImage = "/images/logo.jpg";
+const logoImage = "/images/Ecomow.png";
 const bgImage = "/images/mower.jpg";
 
 // =====================================================
@@ -645,7 +645,7 @@ export default function AppLayout({
 
             {/* DESKTOP NAV */}
 
-            <nav className="fixed bottom-4 left-0 right-0 z-50 px-4">
+            <nav className="hidden md:flex items-center gap-8 font-semibold text-sm">
 
               <Link
                 to="/app"
@@ -810,14 +810,20 @@ export default function AppLayout({
 
       {/* MOBILE NAV */}
 
-      <nav className="md:hidden fixed bottom-6 left-0 right-0 z-50 px-6">
+      <nav className="md:hidden fixed bottom-4 left-0 right-0 z-50 px-5">
 
-        <div className="bg-white rounded-[2rem] shadow-lg px-8 py-5 flex items-center justify-between">
+        <div className= "mx-auto w-full  max-w-[370px] bg-white rounded-[1.5rem] shadow-xl px-5 py-3 flex items-center justify-between ">
 
-          <Link to="/app">
+          <Link to="/app"
+            className="w-10 h-10 flex items-center justify-center">
             <Home
-              size={26}
-              className="text-green-600"
+              size={22}
+              strokeWidth={2.2}
+              className={
+                isActive(".")
+                ? "text-green-700"
+                : "text-gray-700"
+              }
             />
           </Link>
 
