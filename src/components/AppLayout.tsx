@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+
 import {
   Link,
   Outlet,
@@ -96,6 +97,7 @@ const ConnectContent = ({
       <div className="flex items-center justify-between mb-5">
 
         <div>
+
           <h2 className="text-xl font-black text-gray-800">
             Mower Connection
           </h2>
@@ -103,11 +105,23 @@ const ConnectContent = ({
           <p className="text-xs text-gray-500 mt-1">
             Firebase cloud connection
           </p>
+
         </div>
 
         <button
+          type="button"
           onClick={close}
-          className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200"
+          className="
+            w-8
+            h-8
+            bg-gray-100
+            rounded-full
+            flex
+            items-center
+            justify-center
+            hover:bg-gray-200
+            transition
+          "
         >
           <X size={18} />
         </button>
@@ -118,7 +132,15 @@ const ConnectContent = ({
 
         {/* FIREBASE */}
 
-        <div className="flex items-center gap-4 w-full border rounded-xl p-4">
+        <div className="
+          flex
+          items-center
+          gap-4
+          w-full
+          border
+          rounded-xl
+          p-4
+        ">
 
           <Wifi
             className={
@@ -141,20 +163,26 @@ const ConnectContent = ({
           </div>
 
           {connecting ? (
+
             <RefreshCw
               className="animate-spin text-gray-400"
               size={20}
             />
+
           ) : connected ? (
+
             <CircleCheck
               className="text-green-600"
               size={22}
             />
+
           ) : (
+
             <CircleX
               className="text-red-500"
               size={22}
             />
+
           )}
 
         </div>
@@ -164,7 +192,17 @@ const ConnectContent = ({
         <button
           type="button"
           disabled
-          className="flex items-center gap-4 w-full border rounded-xl p-4 opacity-50 cursor-not-allowed"
+          className="
+            flex
+            items-center
+            gap-4
+            w-full
+            border
+            rounded-xl
+            p-4
+            opacity-50
+            cursor-not-allowed
+          "
         >
 
           <Bluetooth className="text-gray-400" />
@@ -186,15 +224,22 @@ const ConnectContent = ({
         {/* MESSAGE */}
 
         {connectMsg && (
+
           <div
-            className={`p-3 rounded-xl text-sm ${
-              connected
-                ? "bg-green-100 text-green-700"
-                : "bg-red-100 text-red-700"
-            }`}
+            className={`
+              p-3
+              rounded-xl
+              text-sm
+              ${
+                connected
+                  ? "bg-green-100 text-green-700"
+                  : "bg-red-100 text-red-700"
+              }
+            `}
           >
             {connectMsg}
           </div>
+
         )}
 
       </div>
@@ -432,8 +477,11 @@ export default function AppLayout({
   useEffect(() => {
 
     if (!user) {
+
       setNotificationCount(0);
+
       return;
+
     }
 
     const notificationQuery =
@@ -496,7 +544,7 @@ export default function AppLayout({
     const unsubscribe =
       onValue(
         connectedRef,
-        async (snapshot) => {
+        (snapshot) => {
 
           const firebaseConnected =
             snapshot.val() === true;
@@ -535,7 +583,9 @@ export default function AppLayout({
   // =====================================================
 
   const handleDisconnect = () => {
+
     setConnectOpen(false);
+
   };
 
   // =====================================================
@@ -592,16 +642,42 @@ export default function AppLayout({
   };
 
   // =====================================================
+  // OPEN CONNECT
+  // =====================================================
+
+  const openConnect = () => {
+
+    setConnectOpen(true);
+
+    handleConnect();
+
+  };
+
+  // =====================================================
   // RENDER
   // =====================================================
 
   return (
-    <div className="relative min-h-screen pb-28 md:pb-0">
 
-      {/* BACKGROUND */}
+    <div className="
+      relative
+      min-h-screen
+      pb-28
+      md:pb-0
+    ">
+
+      {/* =================================================
+          BACKGROUND
+      ================================================= */}
 
       <div
-        className="fixed inset-0 z-0 bg-cover bg-center"
+        className="
+          fixed
+          inset-0
+          z-0
+          bg-cover
+          bg-center
+        "
         style={{
           backgroundImage:
             `url(${bgImage})`,
@@ -610,42 +686,98 @@ export default function AppLayout({
         }}
       />
 
-      <div className="fixed inset-0 z-[1] bg-white/30" />
+      <div className="
+        fixed
+        inset-0
+        z-[1]
+        bg-white/30
+      " />
 
-      {/* HEADER */}
+      {/* =================================================
+          HEADER
+      ================================================= */}
 
-      <header className="sticky top-0 z-50">
+      <header className="
+        sticky
+        top-0
+        z-50
+      ">
 
-        <div className="bg-white/70 backdrop-blur-xl border-b border-white/40 shadow-sm">
+        <div className="
+          bg-white/70
+          backdrop-blur-xl
+          border-b
+          border-white/40
+          shadow-sm
+        ">
 
-          <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="
+            max-w-7xl
+            mx-auto
+            px-6
+            h-16
+            flex
+            items-center
+            justify-between
+          ">
 
             {/* LOGO */}
 
             <Link
               to="/app"
-              className="flex items-center gap-3"
+              className="
+                flex
+                items-center
+                gap-3
+              "
             >
 
-              <div className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center">
+              <div className="
+                w-10
+                h-10
+                rounded-full
+                bg-white
+                shadow-md
+                flex
+                items-center
+                justify-center
+              ">
 
                 <img
                   src={logoImage}
-                  className="w-9 h-9 rounded-full object-cover"
+                  className="
+                    w-9
+                    h-9
+                    rounded-full
+                    object-cover
+                  "
                   alt="Solar Mower Logo"
                 />
 
               </div>
 
-              <span className="font-bold text-green-700 text-lg">
+              <span className="
+                font-bold
+                text-green-700
+                text-lg
+              ">
                 SOLAR MOWER
               </span>
 
             </Link>
 
-            {/* DESKTOP NAV */}
+            {/* =================================================
+                DESKTOP NAV
+            ================================================= */}
 
-            <nav className="hidden md:flex items-center gap-8 font-semibold text-sm">
+            <nav className="
+              hidden
+              md:flex
+              items-center
+              gap-8
+              font-semibold
+              text-sm
+            ">
 
               <Link
                 to="/app"
@@ -682,13 +814,26 @@ export default function AppLayout({
 
             </nav>
 
-            {/* RIGHT */}
+            {/* =================================================
+                DESKTOP RIGHT
+            ================================================= */}
 
-            <div className="flex items-center gap-3">
+            <div className="
+              flex
+              items-center
+              gap-3
+            ">
 
               {/* MOWER STATUS */}
 
-              <div className="hidden md:flex items-center gap-2 text-xs font-semibold">
+              <div className="
+                hidden
+                md:flex
+                items-center
+                gap-2
+                text-xs
+                font-semibold
+              ">
 
                 <span
                   className={`w-2.5 h-2.5 rounded-full ${
@@ -716,11 +861,21 @@ export default function AppLayout({
 
               <button
                 type="button"
-                onClick={() => {
-                  setConnectOpen(true);
-                  handleConnect();
-                }}
-                className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold"
+                onClick={openConnect}
+                className="
+                  hidden
+                  md:flex
+                  items-center
+                  gap-2
+                  px-4
+                  py-2
+                  rounded-xl
+                  bg-green-600
+                  hover:bg-green-700
+                  text-white
+                  text-sm
+                  font-semibold
+                "
               >
 
                 <Wifi size={16} />
@@ -736,7 +891,20 @@ export default function AppLayout({
               <button
                 type="button"
                 onClick={handleLogout}
-                className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-700 hover:bg-gray-800 text-white text-sm font-semibold"
+                className="
+                  hidden
+                  md:flex
+                  items-center
+                  gap-2
+                  px-4
+                  py-2
+                  rounded-xl
+                  bg-gray-700
+                  hover:bg-gray-800
+                  text-white
+                  text-sm
+                  font-semibold
+                "
               >
 
                 <LogOut size={16} />
@@ -754,7 +922,19 @@ export default function AppLayout({
                     "/app/notifications"
                   )
                 }
-                className="relative flex items-center gap-2 px-3 py-2 rounded-full bg-white shadow hover:bg-gray-100 transition"
+                className="
+                  relative
+                  flex
+                  items-center
+                  gap-2
+                  px-3
+                  py-2
+                  rounded-full
+                  bg-white
+                  shadow
+                  hover:bg-gray-100
+                  transition
+                "
               >
 
                 <Bell
@@ -762,7 +942,11 @@ export default function AppLayout({
                   className="text-green-600"
                 />
 
-                <span className="text-sm font-semibold text-gray-700">
+                <span className="
+                  text-sm
+                  font-semibold
+                  text-gray-700
+                ">
 
                   {notificationCount > 0
                     ? `${notificationCount} new`
@@ -772,7 +956,21 @@ export default function AppLayout({
 
                 {notificationCount > 0 && (
 
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                  <span className="
+                    absolute
+                    -top-1
+                    -right-1
+                    bg-red-500
+                    text-white
+                    text-xs
+                    w-5
+                    h-5
+                    rounded-full
+                    flex
+                    items-center
+                    justify-center
+                    font-bold
+                  ">
 
                     {notificationCount}
 
@@ -790,7 +988,9 @@ export default function AppLayout({
 
       </header>
 
-      {/* CONTENT */}
+      {/* =================================================
+          CONTENT
+      ================================================= */}
 
       <main
         className={`relative z-10 transition-all duration-200 ${
@@ -800,7 +1000,12 @@ export default function AppLayout({
         }`}
       >
 
-        <div className="max-w-7xl mx-auto py-6 px-4">
+        <div className="
+          max-w-7xl
+          mx-auto
+          py-6
+          px-4
+        ">
 
           <Outlet />
 
@@ -808,74 +1013,201 @@ export default function AppLayout({
 
       </main>
 
-      {/* MOBILE NAV */}
+      {/* =================================================
+          MOBILE NAVIGATION
+      ================================================= */}
 
-      <nav className="md:hidden fixed bottom-4 left-0 right-0 z-50 px-5">
+      <nav className="
+        md:hidden
+        fixed
+        bottom-4
+        left-0
+        right-0
+        z-50
+        px-4
+      ">
 
-        <div className= "mx-auto w-full  max-w-[370px] bg-white rounded-[1.5rem] shadow-xl px-5 py-3 flex items-center justify-between ">
+        <div className="
+          mx-auto
+          w-full
+          max-w-[380px]
+          h-[68px]
+          bg-white
+          rounded-[1.7rem]
+          shadow-[0_10px_35px_rgba(0,0,0,0.18)]
+          px-4
+          flex
+          items-center
+          justify-between
+          border
+          border-white/80
+        ">
 
-          <Link to="/app"
-            className="w-10 h-10 flex items-center justify-center">
+          {/* =============================================
+              HOME
+          ============================================= */}
+
+          <Link
+            to="/app"
+            aria-label="Home"
+            className="
+              w-12
+              h-12
+              rounded-full
+              flex
+              items-center
+              justify-center
+              transition-all
+              duration-200
+            "
+          >
+
             <Home
-              size={22}
+              size={23}
               strokeWidth={2.2}
               className={
                 isActive(".")
-                ? "text-green-700"
-                : "text-gray-700"
+                  ? "text-green-700"
+                  : "text-gray-700"
               }
             />
+
           </Link>
 
-          <Link to="/app/schedule">
+          {/* =============================================
+              SCHEDULE
+          ============================================= */}
+
+          <Link
+            to="/app/schedule"
+            aria-label="Schedule"
+            className="
+              w-12
+              h-12
+              rounded-full
+              flex
+              items-center
+              justify-center
+              transition-all
+              duration-200
+            "
+          >
+
             <Calendar
-              size={26}
-              className="text-green-600"
+              size={23}
+              strokeWidth={2.2}
+              className={
+                isActive("schedule")
+                  ? "text-green-700"
+                  : "text-gray-700"
+              }
             />
+
           </Link>
+
+          {/* =============================================
+              CENTER CONNECT
+          ============================================= */}
 
           <button
             type="button"
-            onClick={() => {
-              setConnectOpen(true);
-              handleConnect();
-            }}
-            className={`w-16 h-16 rounded-full flex items-center justify-center -mt-10 shadow-xl ring-2 ${
-              mowerOnline
-                ? "bg-green-500 ring-green-500"
-                : "bg-white ring-green-500"
-            }`}
+            aria-label="Connect mower"
+            onClick={openConnect}
+            className={`
+              w-[54px]
+              h-[54px]
+              -mt-7
+              rounded-full
+              flex
+              items-center
+              justify-center
+              shadow-xl
+              border-4
+              border-white
+              transition-all
+              duration-200
+              ${
+                mowerOnline
+                  ? "bg-green-500 ring-2 ring-green-400"
+                  : "bg-white ring-2 ring-gray-200"
+              }
+            `}
           >
 
             {mowerOnline ? (
+
               <Unplug
-                size={30}
+                size={25}
+                strokeWidth={2.2}
                 className="text-white"
               />
+
             ) : (
+
               <Plus
-                size={34}
+                size={29}
+                strokeWidth={2}
                 className="text-green-600"
               />
+
             )}
 
           </button>
 
-          <Link to="/app/energy">
+          {/* =============================================
+              DASHBOARD / ENERGY
+          ============================================= */}
+
+          <Link
+            to="/app/energy"
+            aria-label="Dashboard"
+            className="
+              w-12
+              h-12
+              rounded-full
+              flex
+              items-center
+              justify-center
+              transition-all
+              duration-200
+            "
+          >
+
             <Zap
-              size={26}
-              className="text-green-600"
+              size={23}
+              strokeWidth={2.2}
+              className={
+                isActive("energy")
+                  ? "text-green-700"
+                  : "text-gray-700"
+              }
             />
+
           </Link>
+
+          {/* =============================================
+              LOGOUT
+          ============================================= */}
 
           <button
             type="button"
+            aria-label="Logout"
             onClick={handleLogout}
-            className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center"
+            className="
+              w-12
+              h-12
+              rounded-full
+              flex
+              items-center
+              justify-center
+              transition-all
+              duration-200
+            "
           >
 
             <LogOut
-              size={26}
+              size={23}
+              strokeWidth={2.2}
               className="text-red-500"
             />
 
@@ -885,7 +1217,9 @@ export default function AppLayout({
 
       </nav>
 
-      {/* CONNECT MODAL */}
+      {/* =================================================
+          CONNECT MODAL
+      ================================================= */}
 
       <AnimatePresence>
 
@@ -896,7 +1230,12 @@ export default function AppLayout({
             {/* OVERLAY */}
 
             <motion.div
-              className="fixed inset-0 bg-black/40 z-40"
+              className="
+                fixed
+                inset-0
+                bg-black/40
+                z-40
+              "
               onClick={handleDisconnect}
               initial={{
                 opacity: 0,
@@ -924,10 +1263,25 @@ export default function AppLayout({
                 scale: 0.85,
                 opacity: 0,
               }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              className="
+                fixed
+                inset-0
+                z-50
+                flex
+                items-center
+                justify-center
+                p-4
+              "
             >
 
-              <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl">
+              <div className="
+                bg-white
+                rounded-3xl
+                p-6
+                w-full
+                max-w-md
+                shadow-2xl
+              ">
 
                 <ConnectContent
                   connecting={connecting}
@@ -936,11 +1290,19 @@ export default function AppLayout({
                   close={handleDisconnect}
                 />
 
-                <div className="mt-5 pt-4 border-t">
+                <div className="
+                  mt-5
+                  pt-4
+                  border-t
+                ">
 
                   {/* FIREBASE */}
 
-                  <div className="flex justify-between text-xs">
+                  <div className="
+                    flex
+                    justify-between
+                    text-xs
+                  ">
 
                     <span className="text-gray-500">
                       Firebase:
@@ -962,7 +1324,12 @@ export default function AppLayout({
 
                   {/* MOWER */}
 
-                  <div className="flex justify-between text-xs mt-2">
+                  <div className="
+                    flex
+                    justify-between
+                    text-xs
+                    mt-2
+                  ">
 
                     <span className="text-gray-500">
                       Mower:
@@ -984,7 +1351,12 @@ export default function AppLayout({
 
                   {/* DRIVE */}
 
-                  <div className="flex justify-between text-xs mt-2">
+                  <div className="
+                    flex
+                    justify-between
+                    text-xs
+                    mt-2
+                  ">
 
                     <span className="text-gray-500">
                       Drive:

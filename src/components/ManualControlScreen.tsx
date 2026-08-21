@@ -2271,32 +2271,34 @@ export default function ManualControlScreen() {
               onClick={stopMower}
               aria-label="Emergency stop mower"
               className="
-                group
-                relative
-                flex
-                min-h-[110px]
-                w-full
-                touch-manipulation
-                select-none
-                items-center
-                justify-center
-                gap-4
-                overflow-hidden
-                rounded-[2rem]
-                border-4
-                border-red-700
-                bg-red-600
-                px-6
-                py-7
-                text-white
-                shadow-lg
-                transition-all
-                hover:bg-red-700
-                active:scale-[0.97]
+                 relative 
+                 isolate
+                 w-full
+                 h-[72px]
+                 overflow-hidden
+                 rounded-full
+                 !bg-red-600
+                 hover:!bg-red-700
+                 active:scale-[0.98]
+                 !text-white
+                 shadow-xl
+                 border-4
+                 border-red-300
+                 transition-all
+                 duration-200
+                 flex
+                 items-center
+                 justify-center
+                 gap-3
               "
             >
 
-              <div className="absolute inset-0 animate-pulse bg-red-500/20" />
+              <div className="absolute inset-0
+              -z-10
+              rounded-full
+              bg-red-500
+              opacity-20
+              animate-pulse" />
 
               <div className="relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-4 border-white bg-red-700">
 
@@ -2309,15 +2311,15 @@ export default function ManualControlScreen() {
 
               <div className="relative z-10 text-left">
 
-                <p className="text-[10px] font-black uppercase tracking-[3px] text-red-100">
+                <p className="text-[11px] font-black tracking-[0.25em]">
                   Emergency
                 </p>
 
-                <p className="text-xl font-black uppercase tracking-wider text-white sm:text-2xl">
+                <p className="text-3xl font-black leading-none">
                   STOP
                 </p>
 
-                <p className="text-[9px] font-bold uppercase tracking-wider text-red-100">
+                <p className="text-[9px] font-bold uppercase">
                   Stop all mower systems
                 </p>
 
