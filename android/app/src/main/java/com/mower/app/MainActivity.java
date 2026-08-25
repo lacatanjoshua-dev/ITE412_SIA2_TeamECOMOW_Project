@@ -1,4 +1,4 @@
-package com.mower.Ecomow;
+package com.mower.app;
 
 import com.getcapacitor.BridgeActivity;
 

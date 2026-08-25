@@ -1051,14 +1051,15 @@ export default function AppLayout({
             to="/app"
             aria-label="Home"
             className="
-              w-12
-              h-12
-              rounded-full
+              w-11
+              h-11
               flex
               items-center
               justify-center
+              rounded-full
               transition-all
               duration-200
+              active:scale-90
             "
           >
 
@@ -1082,14 +1083,15 @@ export default function AppLayout({
             to="/app/schedule"
             aria-label="Schedule"
             className="
-              w-12
-              h-12
-              rounded-full
+              w-11
+              h-11
               flex
               items-center
               justify-center
+              rounded-full
               transition-all
               duration-200
+              active:scale-90
             "
           >
 
@@ -1114,22 +1116,27 @@ export default function AppLayout({
             aria-label="Connect mower"
             onClick={openConnect}
             className={`
-              w-[54px]
-              h-[54px]
-              -mt-7
+              absolute
+              left-1/2
+              -translate-x-1/2
+              -top-7
+              w-[58px]
+              h-[58px]
               rounded-full
               flex
               items-center
               justify-center
-              shadow-xl
-              border-4
+              bg-white
+              shadow-[0_10px_25px_rgba(0,0,0,0.18)]
+              border
               border-white
               transition-all
               duration-200
+              active:scale-90
               ${
                 mowerOnline
-                  ? "bg-green-500 ring-2 ring-green-400"
-                  : "bg-white ring-2 ring-gray-200"
+                  ? "ring-2 ring-green-500"
+                  : "ring-2 ring-gray-100"
               }
             `}
           >
@@ -1137,17 +1144,17 @@ export default function AppLayout({
             {mowerOnline ? (
 
               <Unplug
-                size={25}
+                size={28}
                 strokeWidth={2.2}
-                className="text-white"
+                className="text-green-600"
               />
 
             ) : (
 
               <Plus
-                size={29}
-                strokeWidth={2}
-                className="text-green-600"
+                size={30}
+                strokeWidth={2.2}
+                className="text-gray-700"
               />
 
             )}
@@ -1162,19 +1169,20 @@ export default function AppLayout({
             to="/app/energy"
             aria-label="Dashboard"
             className="
-              w-12
-              h-12
-              rounded-full
+              w-11
+              h-11
               flex
               items-center
               justify-center
+              rounded-full
               transition-all
               duration-200
+              active:scale-90
             "
           >
 
             <Zap
-              size={23}
+              size={25}
               strokeWidth={2.2}
               className={
                 isActive("energy")
@@ -1194,14 +1202,15 @@ export default function AppLayout({
             aria-label="Logout"
             onClick={handleLogout}
             className="
-              w-12
-              h-12
-              rounded-full
+              w-11
+              h-11
               flex
               items-center
               justify-center
+              rounded-full
               transition-all
               duration-200
+              active:scale-90
             "
           >
 

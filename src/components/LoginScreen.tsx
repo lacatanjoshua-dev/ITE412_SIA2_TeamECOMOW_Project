@@ -3,12 +3,14 @@ import { useNavigate, Link } from "react-router-dom";
 import { ShieldCheck, UserPlus } from "lucide-react";
 import { motion } from "framer-motion";
 
+import { Capacitor } from "@capacitor/core";
+
+import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 
 import {
-  Capacitor
-} from "@capacitor/core";
-import {
   signInWithPopup,
+  signInWithCredential,
+  GoogleAuthProvider,
   setPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
@@ -36,11 +38,9 @@ interface LoginScreenProps {
 export default function LoginScreen({
   onLogin,
 }: LoginScreenProps) {
-
   const navigate = useNavigate();
 
-  const [loading, setLoading] =
-    useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [error, setError] =
     useState<string | null>(null);
@@ -50,25 +50,21 @@ export default function LoginScreen({
   // =====================================================
 
   useEffect(() => {
-
     auth.useDeviceLanguage();
 
     setPersistence(
       auth,
       browserLocalPersistence
     ).catch(() => {
-
       setPersistence(
         auth,
         browserSessionPersistence
       ).catch(console.error);
-
     });
-
   }, []);
 
   // =====================================================
-  // SAVE USER
+  // SAVE USER TO FIRESTORE
   // =====================================================
 
   const saveUserToFirestore = async (
@@ -77,9 +73,7 @@ export default function LoginScreen({
     name: string,
     photoURL: string
   ) => {
-
     try {
-
       await setDoc(
         doc(db, "users", uid),
         {
@@ -87,25 +81,19 @@ export default function LoginScreen({
           email,
           name,
           photoURL,
-          lastLogin:
-            serverTimestamp(),
-          updatedAt:
-            serverTimestamp(),
+          lastLogin: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         },
         {
           merge: true,
         }
       );
-
     } catch (error) {
-
       console.error(
         "Firestore user save error:",
         error
       );
-
     }
-
   };
 
   // =====================================================
@@ -113,13 +101,104 @@ export default function LoginScreen({
   // =====================================================
 
   const handleLogin = async () => {
-
     try {
-
       setError(null);
       setLoading(true);
 
-      // Detect in-app browser
+      // =================================================
+      // ANDROID / IOS - NATIVE GOOGLE LOGIN
+      // =================================================
+
+      if (Capacitor.isNativePlatform()) {
+        console.log(
+          "Starting native Google Sign-In..."
+        );
+
+        const result =
+          await FirebaseAuthentication.signInWithGoogle();
+
+        console.log(
+          "Google authentication result:",
+          result
+        );
+
+        const idToken =
+          result.credential?.idToken;
+
+        if (!idToken) {
+          throw new Error(
+            "Google Sign-In did not return an ID token."
+          );
+        }
+
+        // Create Firebase credential
+        const credential =
+          GoogleAuthProvider.credential(
+            idToken
+          );
+
+        // Sign in to Firebase JS SDK
+        const firebaseResult =
+          await signInWithCredential(
+            auth,
+            credential
+          );
+
+        const user =
+          firebaseResult.user;
+
+        const uid =
+          user.uid;
+
+        const email =
+          user.email || "";
+
+        const name =
+          user.displayName || "User";
+
+        const photoURL =
+          user.photoURL || "";
+
+        // Save user to Firestore
+        await saveUserToFirestore(
+          uid,
+          email,
+          name,
+          photoURL
+        );
+
+        // Save local user ID
+        localStorage.setItem(
+          "userId",
+          uid
+        );
+
+        console.log(
+          "Native Google Login successful:",
+          {
+            uid,
+            email,
+            name,
+          }
+        );
+
+        // Update App.tsx
+        onLogin();
+
+        // Navigate to application
+        navigate(
+          "/app",
+          {
+            replace: true,
+          }
+        );
+
+        return;
+      }
+
+      // =================================================
+      // WEB - GOOGLE LOGIN
+      // =================================================
 
       const isInAppBrowser =
         /FBAN|FBAV|Instagram|Messenger/i.test(
@@ -127,7 +206,6 @@ export default function LoginScreen({
         );
 
       if (isInAppBrowser) {
-
         setError(
           "Please open this app in Chrome or Safari to login."
         );
@@ -135,7 +213,9 @@ export default function LoginScreen({
         return;
       }
 
-      // Google login
+      console.log(
+        "Starting web Google Sign-In..."
+      );
 
       const result =
         await signInWithPopup(
@@ -158,8 +238,7 @@ export default function LoginScreen({
       const photoURL =
         user.photoURL || "";
 
-      // Save user
-
+      // Save user to Firestore
       await saveUserToFirestore(
         uid,
         email,
@@ -167,15 +246,14 @@ export default function LoginScreen({
         photoURL
       );
 
-      // Local user ID
-
+      // Save local user ID
       localStorage.setItem(
         "userId",
         uid
       );
 
       console.log(
-        "Login successful:",
+        "Web Google Login successful:",
         {
           uid,
           email,
@@ -184,11 +262,9 @@ export default function LoginScreen({
       );
 
       // Update App.tsx
-
       onLogin();
 
       // Navigate
-
       navigate(
         "/app",
         {
@@ -197,17 +273,24 @@ export default function LoginScreen({
       );
 
     } catch (error: any) {
-
       console.error(
         "Login error:",
         error
       );
 
+      console.error(
+        "Login error code:",
+        error?.code
+      );
+
+      // =================================================
+      // FIREBASE ERRORS
+      // =================================================
+
       if (
         error?.code ===
         "auth/popup-blocked"
       ) {
-
         setError(
           "Pop-up was blocked. Please allow pop-ups for this site."
         );
@@ -216,7 +299,6 @@ export default function LoginScreen({
         error?.code ===
         "auth/popup-closed-by-user"
       ) {
-
         setError(
           "Google login was cancelled."
         );
@@ -225,7 +307,6 @@ export default function LoginScreen({
         error?.code ===
         "auth/network-request-failed"
       ) {
-
         setError(
           "Network error. Check your internet connection."
         );
@@ -234,9 +315,16 @@ export default function LoginScreen({
         error?.code ===
         "auth/unauthorized-domain"
       ) {
-
         setError(
           "This domain is not authorized in Firebase Authentication."
+        );
+
+      } else if (
+        error?.code ===
+        "auth/account-exists-with-different-credential"
+      ) {
+        setError(
+          "An account already exists with the same email using a different sign-in method."
         );
 
       } else {
@@ -245,15 +333,11 @@ export default function LoginScreen({
           error?.message ||
           "Authentication failed. Please try again."
         );
-
       }
 
     } finally {
-
       setLoading(false);
-
     }
-
   };
 
   // =====================================================
@@ -312,6 +396,8 @@ export default function LoginScreen({
               />
 
             </div>
+
+            {/* TITLE */}
 
             <h1 className="text-4xl font-black text-white uppercase">
               SOLAR MOWER
@@ -380,3 +466,4 @@ export default function LoginScreen({
     </div>
   );
 }
+
