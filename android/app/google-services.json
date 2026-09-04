@@ -1,37 +1,26 @@
 {
   "project_info": {
-    "project_number": "544654094117",
-    "firebase_url": "https://mowerapp-3be07-default-rtdb.asia-southeast1.firebasedatabase.app",
-    "project_id": "mowerapp-3be07",
-    "storage_bucket": "mowerapp-3be07.firebasestorage.app"
+    "project_number": "185618376949",
+    "project_id": "mowerapp-2867a",
+    "storage_bucket": "mowerapp-2867a.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:544654094117:android:8c89d1a5958f25131cb4cc",
+        "mobilesdk_app_id": "1:185618376949:android:e89ae482f45f5b5cc5fdbc",
         "android_client_info": {
           "package_name": "com.mower.app"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "544654094117-o08qt4vsulsveb0o0bt1n9j8qm98l41g.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBB_7ZoS1T9VvK_r7AA5hN_-_QNG8W9L9s"
+          "current_key": "AIzaSyC1aj5OppYjaSoPwsMKjfHaPhJUCxdqbqA"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "544654094117-o08qt4vsulsveb0o0bt1n9j8qm98l41g.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

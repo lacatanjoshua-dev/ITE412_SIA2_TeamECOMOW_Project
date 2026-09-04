@@ -34,7 +34,6 @@ import SignupScreen from "./components/SignupScreen";
 // =====================================================
 
 import AppLayout from "./components/AppLayout";
-
 import AutomaticControl from "./components/AutomaticControl";
 import ManualControlScreen from "./components/ManualControlScreen";
 import AccountSettingsScreen from "./components/AccountSettingsScreen";
@@ -60,20 +59,12 @@ type UserRole = "user" | "admin" | null;
 // =====================================================
 
 export default function App() {
-  // ===================================================
-  // AUTH STATE
-  // ===================================================
-
   const [user, setUser] = useState<User | null>(null);
-
-  const [role, setRole] =
-    useState<UserRole>(null);
-
-  const [checking, setChecking] =
-    useState(true);
+  const [role, setRole] = useState<UserRole>(null);
+  const [checking, setChecking] = useState(true);
 
   // ===================================================
-  // LOAD USER ROLE FROM FIRESTORE
+  // LOAD USER ROLE
   // ===================================================
 
   const loadUserRole = async (
@@ -86,93 +77,59 @@ export default function App() {
         currentUser.uid
       );
 
-      const userSnapshot =
-        await getDoc(userRef);
+      const snapshot = await getDoc(userRef);
 
-      // =============================================
+      // =================================================
       // USER DOCUMENT EXISTS
-      // =============================================
+      // =================================================
 
-      if (userSnapshot.exists()) {
-        const userData =
-          userSnapshot.data();
+      if (snapshot.exists()) {
+        const data = snapshot.data();
 
-        console.log(
-          "Firestore user data:",
-          userData
-        );
+        console.log("====================================");
+        console.log("AUTH USER:", currentUser.email);
+        console.log("USER UID:", currentUser.uid);
+        console.log("FIRESTORE USER DATA:", data);
+        console.log("ROLE:", data.role);
+        console.log("====================================");
 
-        // =========================================
-        // ADMIN
-        // =========================================
+        const firestoreRole = String(
+          data.role || ""
+        ).toLowerCase();
 
-        if (
-          userData.role === "admin"
-        ) {
-          console.log(
-            "ADMIN ACCOUNT DETECTED"
-          );
-
+        if (firestoreRole === "admin") {
           return "admin";
         }
-
-        // =========================================
-        // NORMAL USER
-        // =========================================
 
         return "user";
       }
 
-      // =============================================
+      // =================================================
       // USER DOCUMENT DOES NOT EXIST
-      // =============================================
+      // =================================================
 
       console.warn(
-        "No Firestore user document found."
+        "No Firestore user document found. Creating user..."
       );
 
-      // =============================================
-      // CREATE DEFAULT USER DOCUMENT
-      // =============================================
-
-      try {
-        await setDoc(
-          userRef,
-          {
-            uid: currentUser.uid,
-
-            email:
-              currentUser.email || "",
-
-            name:
-              currentUser.displayName ||
-              "ECOMOW User",
-
-            photoURL:
-              currentUser.photoURL || "",
-
-            role: "user",
-
-            createdAt:
-              serverTimestamp(),
-
-            updatedAt:
-              serverTimestamp(),
-          },
-          {
-            merge: true,
-          }
-        );
-
-        console.log(
-          "Default user document created."
-        );
-      } catch (createError) {
-        console.error(
-          "Failed to create user document:",
-          createError
-        );
-      }
+      await setDoc(
+        userRef,
+        {
+          uid: currentUser.uid,
+          email: currentUser.email || "",
+          name:
+            currentUser.displayName ||
+            "ECOMOW User",
+          photoURL:
+            currentUser.photoURL || "",
+          role: "user",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        {
+          merge: true,
+        }
+      );
 
       return "user";
     } catch (error) {
@@ -181,7 +138,7 @@ export default function App() {
         error
       );
 
-      // Safe fallback
+      // Safe default
       return "user";
     }
   };
@@ -191,59 +148,56 @@ export default function App() {
   // ===================================================
 
   useEffect(() => {
+    console.log(
+      "Starting Firebase Auth listener..."
+    );
+
     const unsubscribe =
       onAuthStateChanged(
         auth,
         async (currentUser) => {
           console.log(
-            "AUTH USER:",
-            currentUser?.uid
+            "Firebase Auth State:",
+            currentUser?.email || "No user"
           );
 
-          // =========================================
-          // NO USER LOGGED IN
-          // =========================================
+          // =============================================
+          // NOT LOGGED IN
+          // =============================================
 
           if (!currentUser) {
             setUser(null);
-
             setRole(null);
-
             setChecking(false);
 
             return;
           }
 
-          // =========================================
-          // USER LOGGED IN
-          // =========================================
+          // =============================================
+          // LOGGED IN
+          // =============================================
 
           setChecking(true);
-
           setUser(currentUser);
 
-          // =========================================
-          // GET USER ROLE
-          // =========================================
-
           const userRole =
-            await loadUserRole(
-              currentUser
-            );
+            await loadUserRole(currentUser);
 
           console.log(
-            "USER ROLE:",
+            "FINAL USER ROLE:",
             userRole
           );
 
           setRole(userRole);
-
           setChecking(false);
         }
       );
 
-    // Cleanup Firebase listener
     return () => {
+      console.log(
+        "Stopping Firebase Auth listener..."
+      );
+
       unsubscribe();
     };
   }, []);
@@ -254,20 +208,25 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
+      console.log("Logging out...");
+
       await signOut(auth);
 
-      setUser(null);
+      localStorage.removeItem("userId");
 
+      setUser(null);
       setRole(null);
 
       console.log(
-        "Successfully logged out."
+        "Logout successful."
       );
     } catch (error) {
       console.error(
         "Logout error:",
         error
       );
+
+      throw error;
     }
   };
 
@@ -277,17 +236,21 @@ export default function App() {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F7F5EA] p-6">
-        <div className="text-center bg-white rounded-3xl p-8 shadow-lg border border-[#E5D9B6]/50">
-          <div className="w-12 h-12 border-4 border-[#628141]/20 border-t-[#628141] rounded-full animate-spin mx-auto mb-5" />
+      <div className="min-h-screen flex items-center justify-center bg-[#F7F5EA] px-5">
+        <div className="w-full max-w-sm bg-white rounded-[2rem] p-8 shadow-xl border border-[#E5D9B6]/60 text-center">
 
-          <p className="text-sm font-black text-[#40513B]">
+          <div className="w-16 h-16 rounded-2xl bg-[#628141]/10 flex items-center justify-center mx-auto mb-5">
+            <div className="w-9 h-9 border-4 border-[#628141]/20 border-t-[#628141] rounded-full animate-spin" />
+          </div>
+
+          <h2 className="text-lg font-black text-[#40513B]">
             Loading ECOMOW...
-          </p>
+          </h2>
 
-          <p className="text-xs text-[#6D7C66] font-medium mt-1">
+          <p className="text-xs text-[#6D7C66] font-medium mt-2">
             Checking your account
           </p>
+
         </div>
       </div>
     );
@@ -345,10 +308,7 @@ export default function App() {
               />
             ) : (
               <LoginScreen
-                onLogin={() => {
-                  // Firebase Auth listener
-                  // automatically detects login.
-                }}
+                onLogin={() => {}}
               />
             )
           }
@@ -372,17 +332,14 @@ export default function App() {
               />
             ) : (
               <SignupScreen
-                onLogin={() => {
-                  // Firebase Auth listener
-                  // automatically detects signup.
-                }}
+                onLogin={() => {}}
               />
             )
           }
         />
 
         {/* =================================================
-            NORMAL USER APP
+            USER APPLICATION
         ================================================= */}
 
         <Route
@@ -406,12 +363,7 @@ export default function App() {
           }
         >
 
-          {/* =================================================
-              AUTOMATIC CONTROL
-              
-              /app
-              /app/automatic-control
-          ================================================= */}
+          {/* HOME */}
 
           <Route
             index
@@ -420,6 +372,8 @@ export default function App() {
             }
           />
 
+          {/* AUTOMATIC */}
+
           <Route
             path="automatic-control"
             element={
@@ -427,11 +381,7 @@ export default function App() {
             }
           />
 
-          {/* =================================================
-              SCHEDULE
-              
-              /app/schedule
-          ================================================= */}
+          {/* SCHEDULE */}
 
           <Route
             path="schedule"
@@ -440,11 +390,7 @@ export default function App() {
             }
           />
 
-          {/* =================================================
-              ENERGY
-              
-              /app/energy
-          ================================================= */}
+          {/* ENERGY */}
 
           <Route
             path="energy"
@@ -453,11 +399,7 @@ export default function App() {
             }
           />
 
-          {/* =================================================
-              NOTIFICATIONS
-              
-              /app/notifications
-          ================================================= */}
+          {/* NOTIFICATIONS */}
 
           <Route
             path="notifications"
@@ -466,11 +408,7 @@ export default function App() {
             }
           />
 
-          {/* =================================================
-              DEVICES
-              
-              /app/devices
-          ================================================= */}
+          {/* DEVICES */}
 
           <Route
             path="devices"
@@ -479,11 +417,7 @@ export default function App() {
             }
           />
 
-          {/* =================================================
-              MANUAL CONTROL
-              
-              /app/manual-control
-          ================================================= */}
+          {/* MANUAL CONTROL */}
 
           <Route
             path="manual-control"
@@ -492,11 +426,7 @@ export default function App() {
             }
           />
 
-          {/* =================================================
-              ACCOUNT
-              
-              /app/account
-          ================================================= */}
+          {/* ACCOUNT */}
 
           <Route
             path="account"
@@ -508,7 +438,7 @@ export default function App() {
         </Route>
 
         {/* =================================================
-            ADMIN DASHBOARD
+            ADMIN
         ================================================= */}
 
         <Route
@@ -525,13 +455,15 @@ export default function App() {
                 replace
               />
             ) : (
-              <AdminDashboard />
+              <AdminDashboard
+                onLogout={handleLogout}
+              />
             )
           }
         />
 
         {/* =================================================
-            CATCH ALL
+            UNKNOWN ROUTE
         ================================================= */}
 
         <Route

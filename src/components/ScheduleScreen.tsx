@@ -107,21 +107,38 @@ export default function ScheduleScreen() {
   // =======================================================
 
   useEffect(() => {
+    console.log("Starting Firebase authentication listener...");
+
     const unsubscribe = onAuthStateChanged(
       auth,
       (currentUser) => {
         console.log(
-          "Current Firebase user:",
-          currentUser?.uid,
-          currentUser?.email
+          "Firebase Auth user:",
+          currentUser
+            ? {
+                uid: currentUser.uid,
+                email: currentUser.email,
+              }
+            : "NO USER"
         );
 
         setUser(currentUser);
         setAuthLoading(false);
+      },
+      (error) => {
+        console.error(
+          "Firebase authentication error:",
+          error
+        );
+
+        setUser(null);
+        setAuthLoading(false);
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // =======================================================
@@ -143,8 +160,7 @@ export default function ScheduleScreen() {
   };
 
   const selectedDateString = useMemo(
-    () =>
-      formatDateForFirebase(selectedDate),
+    () => formatDateForFirebase(selectedDate),
     [selectedDate]
   );
 
@@ -192,9 +208,7 @@ export default function ScheduleScreen() {
   }, [selectedDate]);
 
   const changeWeek = (amount: number) => {
-    const newDate = new Date(
-      selectedDate
-    );
+    const newDate = new Date(selectedDate);
 
     newDate.setDate(
       newDate.getDate() + amount * 7
@@ -259,10 +273,12 @@ export default function ScheduleScreen() {
         .map(Number);
 
     const start =
-      startHour * 60 + startMinute;
+      startHour * 60 +
+      startMinute;
 
     const end =
-      endHour * 60 + endMinute;
+      endHour * 60 +
+      endMinute;
 
     const difference =
       end - start;
@@ -290,63 +306,164 @@ export default function ScheduleScreen() {
   // LOAD RESERVATIONS
   // =======================================================
 
-  const loadExistingReservations =
-    async () => {
-      try {
-        setLoadingReservations(true);
+  const loadExistingReservations = async () => {
+    // -----------------------------------------------------
+    // USER CHECK
+    // -----------------------------------------------------
 
-        const reservationsRef =
-          collection(
-            db,
-            "rentalRequests"
-          );
+    if (!user) {
+      console.warn(
+        "Cannot load reservations: no authenticated user."
+      );
 
-        const q = query(
-          reservationsRef,
-          where(
-            "mowerId",
-            "==",
-            MOWER.id
-          )
+      setExistingReservations([]);
+      setLoadingReservations(false);
+
+      return;
+    }
+
+    try {
+      setLoadingReservations(true);
+
+      console.log(
+        "Loading reservations from Firestore..."
+      );
+
+      console.log(
+        "Authenticated UID:",
+        user.uid
+      );
+
+      console.log(
+        "Authenticated Email:",
+        user.email
+      );
+
+      const reservationsRef =
+        collection(
+          db,
+          "rentalRequests"
         );
 
-        const snapshot =
-          await getDocs(q);
+      const q = query(
+        reservationsRef,
+        where(
+          "mowerId",
+          "==",
+          MOWER.id
+        )
+      );
 
-        const reservations =
-          snapshot.docs.map(
-            (doc) => ({
-              id: doc.id,
-              ...doc.data(),
-            })
-          ) as Reservation[];
+      const snapshot =
+        await getDocs(q);
 
-        setExistingReservations(
-          reservations
-        );
+      const reservations =
+        snapshot.docs.map(
+          (doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          })
+        ) as Reservation[];
 
-        console.log(
-          "Reservations loaded:",
-          reservations
-        );
-      } catch (error) {
-        console.error(
-          "Failed to load reservations:",
-          error
-        );
+      console.log(
+        "Reservations loaded successfully:",
+        reservations
+      );
 
-        setMsg(
+      setExistingReservations(
+        reservations
+      );
+
+      // Remove previous error
+      setMsg((currentMsg) => {
+        if (
+          currentMsg ===
           "Failed to load existing schedules."
-        );
-      } finally {
-        setLoadingReservations(false);
-      }
-    };
+        ) {
+          return null;
+        }
 
-  // Load reservations after component starts
+        return currentMsg;
+      });
+    } catch (error: any) {
+      console.error(
+        "================================="
+      );
+
+      console.error(
+        "FAILED TO LOAD RESERVATIONS"
+      );
+
+      console.error(
+        "Error:",
+        error
+      );
+
+      console.error(
+        "Error code:",
+        error?.code
+      );
+
+      console.error(
+        "Error message:",
+        error?.message
+      );
+
+      console.error(
+        "================================="
+      );
+
+      setExistingReservations([]);
+
+      if (
+        error?.code ===
+        "permission-denied"
+      ) {
+        setMsg(
+          "❌ Firestore permission denied. Please check your Firebase Firestore Rules."
+        );
+      } else if (
+        error?.code ===
+        "failed-precondition"
+      ) {
+        setMsg(
+          "❌ Firestore is not ready. Please check your Firebase project and Firestore database."
+        );
+      } else if (
+        error?.code ===
+        "unavailable"
+      ) {
+        setMsg(
+          "❌ Firebase is temporarily unavailable. Check your internet connection."
+        );
+      } else {
+        setMsg(
+          "❌ Failed to load existing schedules."
+        );
+      }
+    } finally {
+      setLoadingReservations(false);
+    }
+  };
+
+  // =======================================================
+  // LOAD RESERVATIONS AFTER AUTH
+  // =======================================================
+
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
+    if (!user) {
+      setExistingReservations([]);
+      setLoadingReservations(false);
+
+      return;
+    }
+
     loadExistingReservations();
-  }, []);
+  }, [authLoading, user]);
 
   // =======================================================
   // TIME OVERLAP
@@ -439,6 +556,7 @@ export default function ScheduleScreen() {
           return false;
         }
 
+        // Check time overlap
         return isTimeOverlapping(
           startTime,
           endTime,
@@ -456,7 +574,7 @@ export default function ScheduleScreen() {
   ]);
 
   // =======================================================
-  // BROWSER NOTIFICATION
+  // BROWSER NOTIFICATION PERMISSION
   // =======================================================
 
   const requestNotificationPermission =
@@ -482,6 +600,10 @@ export default function ScheduleScreen() {
       }
     };
 
+  // =======================================================
+  // BROWSER NOTIFICATION
+  // =======================================================
+
   const sendBrowserNotification = (
     title: string,
     body: string
@@ -496,10 +618,17 @@ export default function ScheduleScreen() {
       Notification.permission ===
       "granted"
     ) {
-      new Notification(title, {
-        body,
-        icon: "/favicon.ico",
-      });
+      try {
+        new Notification(title, {
+          body,
+          icon: "/favicon.ico",
+        });
+      } catch (error) {
+        console.error(
+          "Browser notification error:",
+          error
+        );
+      }
     }
   };
 
@@ -516,7 +645,7 @@ export default function ScheduleScreen() {
         "No authenticated user. Notification not created."
       );
 
-      return;
+      return false;
     }
 
     try {
@@ -547,14 +676,27 @@ export default function ScheduleScreen() {
       );
 
       console.log(
-        "Notification saved for user:",
-        user.uid
+        "Notification created successfully."
       );
-    } catch (error) {
+
+      return true;
+    } catch (error: any) {
       console.error(
-        "Notification error:",
+        "Notification creation error:",
         error
       );
+
+      console.error(
+        "Notification error code:",
+        error?.code
+      );
+
+      console.error(
+        "Notification error message:",
+        error?.message
+      );
+
+      return false;
     }
   };
 
@@ -571,7 +713,7 @@ export default function ScheduleScreen() {
 
     if (!user) {
       setMsg(
-        "Please log in first."
+        "❌ Please log in first."
       );
 
       return;
@@ -585,7 +727,7 @@ export default function ScheduleScreen() {
       isPastDate(selectedDate)
     ) {
       setMsg(
-        "You cannot select a date in the past."
+        "❌ You cannot select a date in the past."
       );
 
       return;
@@ -597,7 +739,7 @@ export default function ScheduleScreen() {
 
     if (durationHours <= 0) {
       setMsg(
-        "End time must be later than start time."
+        "❌ End time must be later than start time."
       );
 
       return;
@@ -609,7 +751,7 @@ export default function ScheduleScreen() {
 
     if (hasConflict) {
       setMsg(
-        "This schedule is already occupied by another user."
+        "❌ This schedule is already occupied by another user."
       );
 
       return;
@@ -623,9 +765,47 @@ export default function ScheduleScreen() {
       setSaving(true);
 
       console.log(
-        "Saving schedule for:",
-        user.uid,
+        "================================="
+      );
+
+      console.log(
+        "SAVING SCHEDULE"
+      );
+
+      console.log(
+        "User UID:",
+        user.uid
+      );
+
+      console.log(
+        "User Email:",
         user.email
+      );
+
+      console.log(
+        "Mower:",
+        MOWER.id
+      );
+
+      console.log(
+        "Date:",
+        selectedDateString
+      );
+
+      console.log(
+        "Time:",
+        startTime,
+        "-",
+        endTime
+      );
+
+      console.log(
+        "Duration:",
+        durationHours
+      );
+
+      console.log(
+        "================================="
       );
 
       // ---------------------------------------------------
@@ -639,7 +819,8 @@ export default function ScheduleScreen() {
         userEmail:
           user.email || "",
 
-        mowerId: MOWER.id,
+        mowerId:
+          MOWER.id,
 
         mowerName:
           MOWER.name,
@@ -673,7 +854,11 @@ export default function ScheduleScreen() {
         );
 
       console.log(
-        "Schedule saved successfully:",
+        "Schedule saved successfully."
+      );
+
+      console.log(
+        "Reservation ID:",
         reservationRef.id
       );
 
@@ -705,24 +890,59 @@ export default function ScheduleScreen() {
       );
 
       // ---------------------------------------------------
-      // SUCCESS
+      // SUCCESS MESSAGE
       // ---------------------------------------------------
 
       setMsg(
         "✅ Schedule request submitted successfully. Please wait for admin approval."
       );
 
-      // Reload reservations
+      // ---------------------------------------------------
+      // RELOAD RESERVATIONS
+      // ---------------------------------------------------
+
       await loadExistingReservations();
-    } catch (error) {
+
+    } catch (error: any) {
       console.error(
-        "Schedule save error:",
+        "================================="
+      );
+
+      console.error(
+        "SCHEDULE SAVE ERROR"
+      );
+
+      console.error(
+        "Error:",
         error
       );
 
-      setMsg(
-        "❌ Failed to submit schedule request. Please try again."
+      console.error(
+        "Error code:",
+        error?.code
       );
+
+      console.error(
+        "Error message:",
+        error?.message
+      );
+
+      console.error(
+        "================================="
+      );
+
+      if (
+        error?.code ===
+        "permission-denied"
+      ) {
+        setMsg(
+          "❌ Permission denied by Firestore. Please check your Firestore Rules."
+        );
+      } else {
+        setMsg(
+          "❌ Failed to submit schedule request. Please try again."
+        );
+      }
     } finally {
       setSaving(false);
     }
@@ -736,11 +956,13 @@ export default function ScheduleScreen() {
     return (
       <div className="min-h-[400px] flex items-center justify-center">
         <div className="text-center">
+
           <div className="w-10 h-10 border-4 border-[#628141]/20 border-t-[#628141] rounded-full animate-spin mx-auto" />
 
           <p className="mt-4 text-sm font-bold text-[#6D7C66]">
             Checking account...
           </p>
+
         </div>
       </div>
     );
@@ -753,7 +975,9 @@ export default function ScheduleScreen() {
   if (!user) {
     return (
       <div className="min-h-[400px] flex items-center justify-center">
+
         <div className="text-center bg-white rounded-3xl p-8 shadow-lg">
+
           <AlertCircle
             size={40}
             className="mx-auto text-red-500"
@@ -766,7 +990,9 @@ export default function ScheduleScreen() {
           <p className="mt-2 text-sm text-[#6D7C66]">
             Please log in before creating a schedule.
           </p>
+
         </div>
+
       </div>
     );
   }
@@ -1368,7 +1594,7 @@ export default function ScheduleScreen() {
                 </span>
 
                 <span className="text-xs text-[#628141] font-black text-right break-all">
-                  {user.email}
+                  {user.email || "User"}
                 </span>
 
               </div>
@@ -1559,9 +1785,7 @@ export default function ScheduleScreen() {
             !user ||
             durationHours <= 0 ||
             hasConflict ||
-            isPastDate(
-              selectedDate
-            )
+            isPastDate(selectedDate)
           }
           className="
             w-full
@@ -1658,4 +1882,3 @@ export default function ScheduleScreen() {
     </div>
   );
 }
-

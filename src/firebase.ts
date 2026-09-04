@@ -23,15 +23,15 @@ import {
 // =====================================================
 
 const firebaseConfig = {
-  apiKey: "AIzaSyD6Yn1fQ2HFzLRGeVRzO0d4m38o1_upy-E",
-  authDomain: "mowerapp-3be07.firebaseapp.com",
+  apiKey: "AIzaSyDRO_02Yp7p7wiFbgVXt5__MoIzD4d8olg",
+  authDomain: "mowerapp-2867a.firebaseapp.com",
   databaseURL:
-    "https://mowerapp-3be07-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "mowerapp-3be07",
-  storageBucket: "mowerapp-3be07.firebasestorage.app",
-  messagingSenderId: "544654094117",
-  appId: "1:544654094117:web:cd1cf5fcaa248d0d1cb4cc",
-  measurementId: "G-TBDW2GL4HN",
+    "https://mowerapp-2867a-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "mowerapp-2867a",
+  storageBucket: "mowerapp-2867a.firebasestorage.app",
+  messagingSenderId: "185618376949",
+  appId: "1:185618376949:web:84d646def403c0f6c5fdbc",
+  measurementId: "G-2E4WXPXHMN",
 };
 
 // =====================================================

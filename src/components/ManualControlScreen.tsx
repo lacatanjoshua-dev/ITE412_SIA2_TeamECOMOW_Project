@@ -40,11 +40,25 @@ import {
 // TYPES
 // =====================================================
 
-type Direction =
+type Movement =
   | "forward"
   | "backward"
+  | null;
+
+type Steering =
+  | "LEFT"
+  | "RIGHT"
+  | "STOP";
+
+type ActiveMovement =
+  | "forward"
+  | "backward"
+  | null;
+
+type ActiveSteering =
   | "left"
-  | "right";
+  | "right"
+  | null;
 
 type NotificationType =
   | "warning"
@@ -57,54 +71,78 @@ type NotificationType =
 // =====================================================
 
 const FIREBASE_PATHS = {
+  // CONNECTION
   connectionStatus:
     "ecomow/mower/connection/status",
 
+  connectionLastSeen:
+    "ecomow/mower/connection/lastSeen",
+
+  // DRIVE
   driveCommand:
     "ecomow/mower/drive/command",
 
   driveStatus:
     "ecomow/mower/drive/status",
 
+  // MOVEMENT
   movementCommand:
     "ecomow/mower/movement/command",
 
+  movementStatus:
+    "ecomow/mower/movement/status",
+
+  // STEERING
   steeringCommand:
     "ecomow/mower/steering/command",
 
   steeringStatus:
     "ecomow/mower/steering/status",
 
+  // BLADES
   bladesCommand:
     "ecomow/mower/blades/command",
 
   bladesStatus:
     "ecomow/mower/blades/status",
 
+  // AUTOMATIC
   automaticCommand:
     "ecomow/mower/automatic/command",
 
   automaticStatus:
     "ecomow/mower/automatic/status",
 
+  // CAMERA
   cameraCommand:
     "ecomow/mower/camera/command",
 
   cameraStatus:
     "ecomow/mower/camera/status",
 
-  // IMPORTANT:
-  // Camera URL will now come from Firebase.
   cameraStreamUrl:
     "ecomow/mower/camera/streamUrl",
+
+  // OBSTACLE
+  obstacleStatus:
+    "ecomow/mower/obstacle/status",
+
+  obstacleDistance:
+    "ecomow/mower/obstacle/distance",
 };
+
+// =====================================================
+// CAMERA FALLBACK
+// =====================================================
+
+const DEFAULT_CAMERA_STREAM =
+  "http://10.142.135.72/stream";
 
 // =====================================================
 // COMPONENT
 // =====================================================
 
 export default function ManualControlScreen() {
-
   // ===================================================
   // AUTH
   // ===================================================
@@ -125,6 +163,9 @@ export default function ManualControlScreen() {
   const [mowerOnline, setMowerOnline] =
     useState(false);
 
+  const [lastSeen, setLastSeen] =
+    useState<number | null>(null);
+
   // ===================================================
   // DRIVE
   // ===================================================
@@ -136,8 +177,15 @@ export default function ManualControlScreen() {
   // MOVEMENT
   // ===================================================
 
-  const [direction, setDirection] =
-    useState<Direction | null>(null);
+  const [movementStatus, setMovementStatus] =
+    useState<Movement>(null);
+
+  // ===================================================
+  // STEERING
+  // ===================================================
+
+  const [steeringStatus, setSteeringStatus] =
+    useState<Steering>("STOP");
 
   // ===================================================
   // BLADES
@@ -147,14 +195,7 @@ export default function ManualControlScreen() {
     useState(false);
 
   // ===================================================
-  // STEERING
-  // ===================================================
-
-  const [steeringStatus, setSteeringStatus] =
-    useState("STOP");
-
-  // ===================================================
-  // AUTOMATIC MODE
+  // AUTOMATIC
   // ===================================================
 
   const [automaticRunning, setAutomaticRunning] =
@@ -171,38 +212,67 @@ export default function ManualControlScreen() {
     useState(true);
 
   const [currentCamera, setCurrentCamera] =
-    useState<"front" | "rear">("front");
+    useState<"front" | "rear">("rear");
 
   const [cameraError, setCameraError] =
     useState(false);
 
-  // IMPORTANT:
-  // No hardcoded ESP32-CAM IP anymore.
-  // This URL comes from Firebase:
-  //
-  // ecomow/mower/camera/streamUrl
-  //
   const [cameraStreamUrl, setCameraStreamUrl] =
-    useState("");
+    useState(DEFAULT_CAMERA_STREAM);
+
+  // ===================================================
+  // OBSTACLE
+  // ===================================================
+
+  const [obstacleDetected, setObstacleDetected] =
+    useState(false);
+
+  const [obstacleDistance, setObstacleDistance] =
+    useState<number | null>(null);
+
+  const obstacleNotificationRef =
+    useRef(false);
 
   // ===================================================
   // ACTIVE CONTROL
   // ===================================================
 
   const [activeControl, setActiveControl] =
-    useState<Direction | null>(null);
+    useState<
+      | "forward"
+      | "backward"
+      | "left"
+      | "right"
+      | null
+    >(null);
 
   // ===================================================
-  // POINTER CONTROL
+  // POINTERS
   // ===================================================
 
-  const activePointerRef =
+  const movementPointerRef =
     useRef<number | null>(null);
 
-  const activeDirectionRef =
-    useRef<Direction | null>(null);
+  const steeringPointerRef =
+    useRef<number | null>(null);
 
-  const stoppingRef =
+  const activeMovementRef =
+    useRef<ActiveMovement>(null);
+
+  const activeSteeringRef =
+    useRef<ActiveSteering>(null);
+
+  // ===================================================
+  // STOP LOCKS
+  // ===================================================
+
+  const movementStoppingRef =
+    useRef(false);
+
+  const steeringStoppingRef =
+    useRef(false);
+
+  const emergencyStoppingRef =
     useRef(false);
 
   // ===================================================
@@ -210,20 +280,16 @@ export default function ManualControlScreen() {
   // ===================================================
 
   useEffect(() => {
-
     const unsubscribe =
       onAuthStateChanged(
         auth,
         (currentUser) => {
-
           setUser(currentUser);
           setAuthReady(true);
-
         }
       );
 
     return () => unsubscribe();
-
   }, []);
 
   // ===================================================
@@ -235,18 +301,15 @@ export default function ManualControlScreen() {
     description: string,
     type: NotificationType
   ) => {
-
     if (!user) {
-
       console.warn(
-        "Cannot create notification: no authenticated user."
+        "No authenticated user. Notification skipped."
       );
 
       return;
     }
 
     try {
-
       await addDoc(
         collection(
           db,
@@ -259,479 +322,31 @@ export default function ManualControlScreen() {
           description,
           type,
           read: false,
-          createdAt: serverTimestamp(),
+          createdAt:
+            serverTimestamp(),
         }
       );
-
     } catch (error) {
-
       console.error(
         "Firestore notification error:",
         error
       );
-
     }
   };
 
   // ===================================================
-  // CONNECTION STATUS
-  // ===================================================
-
-  useEffect(() => {
-
-    const connectionRef =
-      ref(
-        realtimeDb,
-        FIREBASE_PATHS.connectionStatus
-      );
-
-    const unsubscribe =
-      onValue(
-        connectionRef,
-
-        (snapshot) => {
-
-          const status =
-            snapshot.val();
-
-          console.log(
-            "Mower Connection:",
-            status
-          );
-
-          if (status === "ONLINE") {
-
-            setIsConnected(true);
-            setMowerOnline(true);
-
-          } else {
-
-            setIsConnected(true);
-            setMowerOnline(false);
-
-          }
-
-        },
-
-        (error) => {
-
-          console.error(
-            "Connection status error:",
-            error
-          );
-
-          setIsConnected(false);
-          setMowerOnline(false);
-
-        }
-      );
-
-    return () => unsubscribe();
-
-  }, []);
-
-  // ===================================================
-  // DRIVE STATUS
-  // ===================================================
-
-  useEffect(() => {
-
-    const driveStatusRef =
-      ref(
-        realtimeDb,
-        FIREBASE_PATHS.driveStatus
-      );
-
-    const unsubscribe =
-      onValue(
-        driveStatusRef,
-
-        (snapshot) => {
-
-          const status =
-            snapshot.val();
-
-          console.log(
-            "Drive Status:",
-            status
-          );
-
-          if (
-            status === "ON" ||
-            status === "FORWARD" ||
-            status === "BACKWARD"
-          ) {
-
-            setDriveActive(true);
-
-          } else {
-
-            setDriveActive(false);
-            setActiveControl(null);
-
-          }
-
-        }
-      );
-
-    return () => unsubscribe();
-
-  }, []);
-
-  // ===================================================
-  // MOVEMENT STATUS
-  // ===================================================
-
-  useEffect(() => {
-
-    const movementRef =
-      ref(
-        realtimeDb,
-        FIREBASE_PATHS.movementCommand
-      );
-
-    const unsubscribe =
-      onValue(
-        movementRef,
-
-        (snapshot) => {
-
-          const movement =
-            snapshot.val();
-
-          console.log(
-            "Movement Command:",
-            movement
-          );
-
-          if (
-            movement === "forward"
-          ) {
-
-            setDirection("forward");
-
-          } else if (
-            movement === "backward"
-          ) {
-
-            setDirection("backward");
-
-          } else if (
-            movement === "stop"
-          ) {
-
-            setDirection(null);
-
-          }
-
-        }
-      );
-
-    return () => unsubscribe();
-
-  }, []);
-
-  // ===================================================
-  // STEERING STATUS
-  // ===================================================
-
-  useEffect(() => {
-
-    const steeringStatusRef =
-      ref(
-        realtimeDb,
-        FIREBASE_PATHS.steeringStatus
-      );
-
-    const unsubscribe =
-      onValue(
-        steeringStatusRef,
-
-        (snapshot) => {
-
-          const status =
-            snapshot.val();
-
-          console.log(
-            "Steering Status:",
-            status
-          );
-
-          const normalizedStatus =
-            String(
-              status || "STOP"
-            ).toUpperCase();
-
-          setSteeringStatus(
-            normalizedStatus
-          );
-
-          if (
-            normalizedStatus === "LEFT"
-          ) {
-
-            setDirection("left");
-
-          } else if (
-            normalizedStatus === "RIGHT"
-          ) {
-
-            setDirection("right");
-
-          } else if (
-            normalizedStatus === "STOP"
-          ) {
-
-            setDirection(null);
-
-          }
-
-        }
-      );
-
-    return () => unsubscribe();
-
-  }, []);
-
-  // ===================================================
-  // BLADE STATUS
-  // ===================================================
-
-  useEffect(() => {
-
-    const bladesStatusRef =
-      ref(
-        realtimeDb,
-        FIREBASE_PATHS.bladesStatus
-      );
-
-    const unsubscribe =
-      onValue(
-        bladesStatusRef,
-
-        (snapshot) => {
-
-          const status =
-            snapshot.val();
-
-          console.log(
-            "Blade Status:",
-            status
-          );
-
-          setBladesActive(
-            status === "ON"
-          );
-
-        }
-      );
-
-    return () => unsubscribe();
-
-  }, []);
-
-  // ===================================================
-  // AUTOMATIC STATUS
-  // ===================================================
-
-  useEffect(() => {
-
-    const automaticStatusRef =
-      ref(
-        realtimeDb,
-        FIREBASE_PATHS.automaticStatus
-      );
-
-    const unsubscribe =
-      onValue(
-        automaticStatusRef,
-
-        (snapshot) => {
-
-          const status =
-            snapshot.val();
-
-          console.log(
-            "Automatic Status:",
-            status
-          );
-
-          const normalizedStatus =
-            String(
-              status || "STOPPED"
-            ).toUpperCase();
-
-          setAutomaticStatus(
-            normalizedStatus
-          );
-
-          setAutomaticRunning(
-            normalizedStatus === "RUNNING"
-          );
-
-        }
-      );
-
-    return () => unsubscribe();
-
-  }, []);
-
-  // ===================================================
-  // CAMERA STATUS
-  // ===================================================
-
-  useEffect(() => {
-
-    const cameraStatusRef =
-      ref(
-        realtimeDb,
-        FIREBASE_PATHS.cameraStatus
-      );
-
-    const unsubscribe =
-      onValue(
-        cameraStatusRef,
-
-        (snapshot) => {
-
-          const status =
-            snapshot.val();
-
-          console.log(
-            "Camera Status:",
-            status
-          );
-
-          const normalizedStatus =
-            String(
-              status || ""
-            ).toUpperCase();
-
-          if (
-            normalizedStatus === "OFF"
-          ) {
-
-            setCameraActive(false);
-
-          } else if (
-            normalizedStatus === "ON"
-          ) {
-
-            setCameraActive(true);
-
-          } else if (
-            normalizedStatus === "ONLINE"
-          ) {
-
-            setCameraActive(true);
-
-          } else if (
-            normalizedStatus === "FRONT"
-          ) {
-
-            setCameraActive(true);
-            setCurrentCamera("front");
-
-          } else if (
-            normalizedStatus === "REAR"
-          ) {
-
-            setCameraActive(true);
-            setCurrentCamera("rear");
-
-          }
-
-        },
-
-        (error) => {
-
-          console.error(
-            "Camera status error:",
-            error
-          );
-
-        }
-      );
-
-    return () => unsubscribe();
-
-  }, []);
-
-  // ===================================================
-  // CAMERA STREAM URL
-  // ===================================================
-
-  useEffect(() => {
-
-    const cameraStreamRef =
-      ref(
-        realtimeDb,
-        FIREBASE_PATHS.cameraStreamUrl
-      );
-
-    const unsubscribe =
-      onValue(
-        cameraStreamRef,
-
-        (snapshot) => {
-
-          const url =
-            snapshot.val();
-
-          console.log(
-            "Firebase Camera Stream URL:",
-            url
-          );
-
-          if (
-            typeof url === "string" &&
-            url.trim() !== ""
-          ) {
-
-            setCameraStreamUrl(
-              url.trim()
-            );
-
-            setCameraError(false);
-
-          } else {
-
-            setCameraStreamUrl("");
-
-          }
-
-        },
-
-        (error) => {
-
-          console.error(
-            "Camera stream URL error:",
-            error
-          );
-
-          setCameraStreamUrl("");
-          setCameraError(true);
-
-        }
-      );
-
-    return () => unsubscribe();
-
-  }, []);
-
-  // ===================================================
-  // WRITE FIREBASE COMMAND
+  // GENERIC FIREBASE COMMAND
   // ===================================================
 
   const writeCommand = async (
     path: string,
     command: string
   ) => {
-
     try {
-
       console.log(
-        `Firebase Command -> ${path}:`,
+        "[FIREBASE COMMAND]",
+        path,
+        "=>",
         command
       );
 
@@ -743,33 +358,664 @@ export default function ManualControlScreen() {
         command
       );
 
+      setIsConnected(true);
+
       return true;
-
     } catch (error) {
-
       console.error(
-        `Firebase command failed (${path}):`,
+        "[FIREBASE COMMAND ERROR]",
+        path,
         error
       );
 
       setIsConnected(false);
 
       return false;
-
     }
   };
 
   // ===================================================
-  // DRIVE ON
+  // CONNECTION STATUS
+  // ===================================================
+
+  useEffect(() => {
+    const connectionRef =
+      ref(
+        realtimeDb,
+        FIREBASE_PATHS.connectionStatus
+      );
+
+    const unsubscribe =
+      onValue(
+        connectionRef,
+        (snapshot) => {
+          const value =
+            String(
+              snapshot.val() ?? ""
+            ).toUpperCase();
+
+          console.log(
+            "[REALTIME] Connection:",
+            value
+          );
+
+          setIsConnected(true);
+
+          setMowerOnline(
+            value === "ONLINE"
+          );
+        },
+        (error) => {
+          console.error(
+            "Connection listener error:",
+            error
+          );
+
+          setIsConnected(false);
+          setMowerOnline(false);
+        }
+      );
+
+    return () => unsubscribe();
+  }, []);
+
+  // ===================================================
+  // CONNECTION LAST SEEN
+  // ===================================================
+
+  useEffect(() => {
+    const lastSeenRef =
+      ref(
+        realtimeDb,
+        FIREBASE_PATHS.connectionLastSeen
+      );
+
+    const unsubscribe =
+      onValue(
+        lastSeenRef,
+        (snapshot) => {
+          const value =
+            Number(snapshot.val());
+
+          if (
+            Number.isFinite(value)
+          ) {
+            setLastSeen(value);
+          } else {
+            setLastSeen(null);
+          }
+        },
+        (error) => {
+          console.error(
+            "Last seen listener error:",
+            error
+          );
+
+          setLastSeen(null);
+        }
+      );
+
+    return () => unsubscribe();
+  }, []);
+
+  // ===================================================
+  // ONLINE TIMEOUT CHECK
+  // ===================================================
+
+  useEffect(() => {
+    if (lastSeen === null) {
+      return;
+    }
+
+    const checkOnline = () => {
+      const now =
+        Date.now();
+
+      const difference =
+        now - lastSeen;
+
+      const isFresh =
+        difference <= 15000;
+
+      setMowerOnline(
+        isFresh
+      );
+    };
+
+    checkOnline();
+
+    const timer =
+      window.setInterval(
+        checkOnline,
+        3000
+      );
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [lastSeen]);
+
+  // ===================================================
+  // DRIVE STATUS
+  // ===================================================
+
+  useEffect(() => {
+    const driveRef =
+      ref(
+        realtimeDb,
+        FIREBASE_PATHS.driveStatus
+      );
+
+    const unsubscribe =
+      onValue(
+        driveRef,
+        (snapshot) => {
+          const value =
+            String(
+              snapshot.val() ?? ""
+            ).toUpperCase();
+
+          console.log(
+            "[REALTIME] Drive Status:",
+            value
+          );
+
+          const active =
+            value === "ON" ||
+            value === "ENGAGED" ||
+            value === "FORWARD" ||
+            value === "BACKWARD";
+
+          setDriveActive(active);
+
+          if (!active) {
+            setMovementStatus(null);
+            setSteeringStatus("STOP");
+
+            activeMovementRef.current =
+              null;
+
+            activeSteeringRef.current =
+              null;
+
+            movementPointerRef.current =
+              null;
+
+            steeringPointerRef.current =
+              null;
+
+            setActiveControl(null);
+          }
+        },
+        (error) => {
+          console.error(
+            "Drive status listener error:",
+            error
+          );
+        }
+      );
+
+    return () => unsubscribe();
+  }, []);
+
+  // ===================================================
+  // MOVEMENT STATUS
+  // IMPORTANT:
+  // READ movement/status
+  // NOT movement/command
+  // ===================================================
+
+  useEffect(() => {
+    const movementRef =
+      ref(
+        realtimeDb,
+        FIREBASE_PATHS.movementStatus
+      );
+
+    const unsubscribe =
+      onValue(
+        movementRef,
+        (snapshot) => {
+          const value =
+            String(
+              snapshot.val() ?? "STOP"
+            ).toLowerCase();
+
+          console.log(
+            "[REALTIME] Movement Status:",
+            value
+          );
+
+          if (
+            value === "forward"
+          ) {
+            setMovementStatus(
+              "forward"
+            );
+          } else if (
+            value === "backward"
+          ) {
+            setMovementStatus(
+              "backward"
+            );
+          } else {
+            setMovementStatus(null);
+          }
+        },
+        (error) => {
+          console.error(
+            "Movement status listener error:",
+            error
+          );
+        }
+      );
+
+    return () => unsubscribe();
+  }, []);
+
+  // ===================================================
+  // STEERING STATUS
+  // ===================================================
+
+  useEffect(() => {
+    const steeringRef =
+      ref(
+        realtimeDb,
+        FIREBASE_PATHS.steeringStatus
+      );
+
+    const unsubscribe =
+      onValue(
+        steeringRef,
+        (snapshot) => {
+          const value =
+            String(
+              snapshot.val() ?? "STOP"
+            ).toUpperCase();
+
+          console.log(
+            "[REALTIME] Steering:",
+            value
+          );
+
+          if (
+            value === "LEFT"
+          ) {
+            setSteeringStatus(
+              "LEFT"
+            );
+          } else if (
+            value === "RIGHT"
+          ) {
+            setSteeringStatus(
+              "RIGHT"
+            );
+          } else {
+            setSteeringStatus(
+              "STOP"
+            );
+          }
+        },
+        (error) => {
+          console.error(
+            "Steering status listener error:",
+            error
+          );
+        }
+      );
+
+    return () => unsubscribe();
+  }, []);
+
+  // ===================================================
+  // BLADES STATUS
+  // ===================================================
+
+  useEffect(() => {
+    const bladesRef =
+      ref(
+        realtimeDb,
+        FIREBASE_PATHS.bladesStatus
+      );
+
+    const unsubscribe =
+      onValue(
+        bladesRef,
+        (snapshot) => {
+          const value =
+            String(
+              snapshot.val() ?? "OFF"
+            ).toUpperCase();
+
+          console.log(
+            "[REALTIME] Blades:",
+            value
+          );
+
+          setBladesActive(
+            value === "ON" ||
+            value === "RUNNING"
+          );
+        },
+        (error) => {
+          console.error(
+            "Blades listener error:",
+            error
+          );
+        }
+      );
+
+    return () => unsubscribe();
+  }, []);
+
+  // ===================================================
+  // AUTOMATIC STATUS
+  // ===================================================
+
+  useEffect(() => {
+    const automaticRef =
+      ref(
+        realtimeDb,
+        FIREBASE_PATHS.automaticStatus
+      );
+
+    const unsubscribe =
+      onValue(
+        automaticRef,
+        (snapshot) => {
+          const value =
+            String(
+              snapshot.val() ?? "STOPPED"
+            ).toUpperCase();
+
+          console.log(
+            "[REALTIME] Automatic:",
+            value
+          );
+
+          setAutomaticStatus(
+            value
+          );
+
+          setAutomaticRunning(
+            value === "RUNNING" ||
+            value === "ON" ||
+            value === "ACTIVE"
+          );
+        },
+        (error) => {
+          console.error(
+            "Automatic listener error:",
+            error
+          );
+        }
+      );
+
+    return () => unsubscribe();
+  }, []);
+
+  // ===================================================
+  // CAMERA STATUS
+  // ===================================================
+
+  useEffect(() => {
+    const cameraRef =
+      ref(
+        realtimeDb,
+        FIREBASE_PATHS.cameraStatus
+      );
+
+    const unsubscribe =
+      onValue(
+        cameraRef,
+        (snapshot) => {
+          const value =
+            String(
+              snapshot.val() ?? ""
+            ).toUpperCase();
+
+          console.log(
+            "[REALTIME] Camera:",
+            value
+          );
+
+          if (
+            value === "OFF"
+          ) {
+            setCameraActive(false);
+          } else if (
+            value === "ON" ||
+            value === "ONLINE"
+          ) {
+            setCameraActive(true);
+          } else if (
+            value === "FRONT"
+          ) {
+            setCameraActive(true);
+            setCurrentCamera(
+              "front"
+            );
+          } else if (
+            value === "REAR"
+          ) {
+            setCameraActive(true);
+            setCurrentCamera(
+              "rear"
+            );
+          }
+        },
+        (error) => {
+          console.error(
+            "Camera status listener error:",
+            error
+          );
+        }
+      );
+
+    return () => unsubscribe();
+  }, []);
+
+  // ===================================================
+  // CAMERA STREAM URL
+  // ===================================================
+
+  useEffect(() => {
+    const streamRef =
+      ref(
+        realtimeDb,
+        FIREBASE_PATHS.cameraStreamUrl
+      );
+
+    const unsubscribe =
+      onValue(
+        streamRef,
+        (snapshot) => {
+          const value =
+            snapshot.val();
+
+          console.log(
+            "[REALTIME] Camera Stream URL:",
+            value
+          );
+
+          if (
+            typeof value === "string" &&
+            value.trim() !== ""
+          ) {
+            setCameraStreamUrl(
+              value.trim()
+            );
+
+            setCameraError(false);
+          } else {
+            setCameraStreamUrl(
+              DEFAULT_CAMERA_STREAM
+            );
+
+            setCameraError(false);
+          }
+        },
+        (error) => {
+          console.error(
+            "Camera stream URL listener error:",
+            error
+          );
+
+          setCameraStreamUrl(
+            DEFAULT_CAMERA_STREAM
+          );
+
+          setCameraError(false);
+        }
+      );
+
+    return () => unsubscribe();
+  }, []);
+
+  // ===================================================
+  // OBSTACLE STATUS
+  // ===================================================
+
+  useEffect(() => {
+    const obstacleRef =
+      ref(
+        realtimeDb,
+        FIREBASE_PATHS.obstacleStatus
+      );
+
+    const unsubscribe =
+      onValue(
+        obstacleRef,
+        async (snapshot) => {
+          const value =
+            String(
+              snapshot.val() ?? "CLEAR"
+            ).toUpperCase();
+
+          console.log(
+            "[REALTIME] Obstacle:",
+            value
+          );
+
+          const detected =
+            value === "DETECTED" ||
+            value === "OBSTACLE" ||
+            value === "BLOCKED";
+
+          setObstacleDetected(
+            detected
+          );
+
+          // =========================================
+          // OBSTACLE DETECTED
+          // =========================================
+
+          if (
+            detected &&
+            !obstacleNotificationRef.current
+          ) {
+            obstacleNotificationRef.current =
+              true;
+
+            await createNotification(
+              "Obstacle Detected",
+              "May nakaharang sa mower.",
+              "warning"
+            );
+          }
+
+          // =========================================
+          // OBSTACLE CLEARED
+          // =========================================
+
+          if (!detected) {
+            obstacleNotificationRef.current =
+              false;
+          }
+        },
+        (error) => {
+          console.error(
+            "Obstacle listener error:",
+            error
+          );
+        }
+      );
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // ===================================================
+  // OBSTACLE DISTANCE
+  // ===================================================
+
+  useEffect(() => {
+    const distanceRef =
+      ref(
+        realtimeDb,
+        FIREBASE_PATHS.obstacleDistance
+      );
+
+    const unsubscribe =
+      onValue(
+        distanceRef,
+        (snapshot) => {
+          const value =
+            snapshot.val();
+
+          console.log(
+            "[REALTIME] Obstacle Distance:",
+            value
+          );
+
+          const numericValue =
+            Number(value);
+
+          if (
+            Number.isFinite(
+              numericValue
+            )
+          ) {
+            setObstacleDistance(
+              numericValue
+            );
+          } else {
+            setObstacleDistance(
+              null
+            );
+          }
+        },
+        (error) => {
+          console.error(
+            "Obstacle distance listener error:",
+            error
+          );
+
+          setObstacleDistance(null);
+        }
+      );
+
+    return () => unsubscribe();
+  }, []);
+
+  // ===================================================
+  // ENGAGE DRIVE
   // ===================================================
 
   const engageDrive = async () => {
-
     if (automaticRunning) {
-
       await createNotification(
         "Manual Control Locked",
-        "Manual drive control is disabled while automatic mode is running.",
+        "Manual control is disabled while automatic mode is running.",
+        "warning"
+      );
+
+      return;
+    }
+
+    if (!mowerOnline) {
+      await createNotification(
+        "Mower Offline",
+        "The mower is currently offline.",
         "warning"
       );
 
@@ -787,18 +1033,14 @@ export default function ManualControlScreen() {
       );
 
     if (!success) {
-
       await createNotification(
         "Drive Command Failed",
-        "Failed to engage the mower drive system.",
+        "Unable to send DRIVE ON command to Firebase.",
         "error"
       );
 
       return;
     }
-
-    setDriveActive(true);
-    setIsConnected(true);
 
     await createNotification(
       "Drive ON",
@@ -808,25 +1050,13 @@ export default function ManualControlScreen() {
   };
 
   // ===================================================
-  // DRIVE OFF
+  // DISENGAGE DRIVE
   // ===================================================
 
   const disengageDrive = async () => {
-
     try {
-
       const results =
         await Promise.all([
-          writeCommand(
-            FIREBASE_PATHS.bladesCommand,
-            "OFF"
-          ),
-
-          writeCommand(
-            FIREBASE_PATHS.driveCommand,
-            "OFF"
-          ),
-
           writeCommand(
             FIREBASE_PATHS.movementCommand,
             "stop"
@@ -836,139 +1066,60 @@ export default function ManualControlScreen() {
             FIREBASE_PATHS.steeringCommand,
             "STOP"
           ),
+
+          writeCommand(
+            FIREBASE_PATHS.bladesCommand,
+            "OFF"
+          ),
+
+          writeCommand(
+            FIREBASE_PATHS.driveCommand,
+            "OFF"
+          ),
         ]);
 
-      if (!results.every(Boolean)) {
-
+      if (
+        !results.every(Boolean)
+      ) {
         throw new Error(
           "One or more drive shutdown commands failed."
         );
-
       }
 
-      setDriveActive(false);
-      setBladesActive(false);
-      setDirection(null);
-      setSteeringStatus("STOP");
-      setActiveControl(null);
-
-      activeDirectionRef.current =
+      movementPointerRef.current =
         null;
 
-      setIsConnected(true);
+      steeringPointerRef.current =
+        null;
+
+      activeMovementRef.current =
+        null;
+
+      activeSteeringRef.current =
+        null;
+
+      setMovementStatus(null);
+      setSteeringStatus("STOP");
+      setBladesActive(false);
+      setActiveControl(null);
 
       await createNotification(
         "Drive OFF",
-        "Mower drive system has been disengaged and cutting blades were stopped.",
+        "Drive, movement, steering, and blades have been stopped.",
         "system"
       );
-
     } catch (error) {
-
       console.error(
-        "Drive OFF error:",
+        "Disengage drive error:",
         error
       );
 
       await createNotification(
         "Drive Shutdown Failed",
-        "One or more mower shutdown commands failed.",
+        "Failed to completely shut down the drive system.",
         "error"
       );
-
     }
-  };
-
-  // ===================================================
-  // BLADE ON
-  // ===================================================
-
-  const engageBlades = async () => {
-
-    if (!driveActive) {
-
-      await createNotification(
-        "Drive Required",
-        "Engage the drive system before turning on the cutting blades.",
-        "warning"
-      );
-
-      return;
-    }
-
-    if (automaticRunning) {
-
-      await createNotification(
-        "Manual Control Locked",
-        "Blade control is disabled while automatic mode is running.",
-        "warning"
-      );
-
-      return;
-    }
-
-    if (bladesActive) {
-      return;
-    }
-
-    const success =
-      await writeCommand(
-        FIREBASE_PATHS.bladesCommand,
-        "ON"
-      );
-
-    if (!success) {
-
-      await createNotification(
-        "Blade Command Failed",
-        "Failed to turn ON the cutting blades.",
-        "error"
-      );
-
-      return;
-    }
-
-    setBladesActive(true);
-    setIsConnected(true);
-
-    await createNotification(
-      "Blades ON",
-      "Cutting blades have been engaged.",
-      "warning"
-    );
-  };
-
-  // ===================================================
-  // BLADE OFF
-  // ===================================================
-
-  const disengageBlades = async () => {
-
-    const success =
-      await writeCommand(
-        FIREBASE_PATHS.bladesCommand,
-        "OFF"
-      );
-
-    if (!success) {
-
-      await createNotification(
-        "Blade Command Failed",
-        "Failed to turn OFF the cutting blades.",
-        "error"
-      );
-
-      return;
-    }
-
-    setBladesActive(false);
-    setIsConnected(true);
-
-    await createNotification(
-      "Blades OFF",
-      "Cutting blades have been disengaged.",
-      "system"
-    );
   };
 
   // ===================================================
@@ -980,23 +1131,28 @@ export default function ManualControlScreen() {
       | "forward"
       | "backward"
   ) => {
-
     if (automaticRunning) {
+      return false;
+    }
 
-      await createNotification(
-        "Manual Control Locked",
-        "Movement controls are disabled while automatic mode is running.",
-        "warning"
-      );
-
+    if (!mowerOnline) {
       return false;
     }
 
     if (!driveActive) {
+      return false;
+    }
 
+    // SAFETY:
+    // Forward movement blocked by obstacle
+
+    if (
+      obstacleDetected &&
+      movement === "forward"
+    ) {
       await createNotification(
-        "Drive Required",
-        "Engage the drive system before moving the mower.",
+        "Movement Blocked",
+        "Forward movement is blocked because an obstacle was detected.",
         "warning"
       );
 
@@ -1013,18 +1169,69 @@ export default function ManualControlScreen() {
       return false;
     }
 
-    setActiveControl(
+    setMovementStatus(
       movement
     );
 
-    setDirection(
-      movement
-    );
-
-    setIsConnected(true);
+    activeMovementRef.current =
+      movement;
 
     return true;
   };
+
+  // ===================================================
+  // STOP MOVEMENT
+  // ===================================================
+
+  const stopMovementOnly =
+    async () => {
+      if (
+        movementStoppingRef.current
+      ) {
+        return;
+      }
+
+      movementStoppingRef.current =
+        true;
+
+      try {
+        const success =
+          await writeCommand(
+            FIREBASE_PATHS.movementCommand,
+            "stop"
+          );
+
+        if (!success) {
+          return;
+        }
+
+        activeMovementRef.current =
+          null;
+
+        setMovementStatus(null);
+
+        if (
+          activeSteeringRef.current ===
+          "left"
+        ) {
+          setActiveControl(
+            "left"
+          );
+        } else if (
+          activeSteeringRef.current ===
+          "right"
+        ) {
+          setActiveControl(
+            "right"
+          );
+        } else {
+          setActiveControl(null);
+        }
+      } finally {
+        movementStoppingRef.current =
+          false;
+      }
+    };
 
   // ===================================================
   // STEER MOWER
@@ -1035,26 +1242,15 @@ export default function ManualControlScreen() {
       | "LEFT"
       | "RIGHT"
   ) => {
-
     if (automaticRunning) {
+      return false;
+    }
 
-      await createNotification(
-        "Manual Control Locked",
-        "Steering controls are disabled while automatic mode is running.",
-        "warning"
-      );
-
+    if (!mowerOnline) {
       return false;
     }
 
     if (!driveActive) {
-
-      await createNotification(
-        "Drive Required",
-        "Engage the drive system before steering the mower.",
-        "warning"
-      );
-
       return false;
     }
 
@@ -1068,97 +1264,87 @@ export default function ManualControlScreen() {
       return false;
     }
 
-    const directionValue =
-      steering.toLowerCase() as Direction;
-
-    setActiveControl(
-      directionValue
-    );
-
     setSteeringStatus(
       steering
     );
 
-    setDirection(
-      directionValue
-    );
-
-    setIsConnected(true);
+    activeSteeringRef.current =
+      steering === "LEFT"
+        ? "left"
+        : "right";
 
     return true;
   };
 
   // ===================================================
-  // STOP MOVEMENT
+  // STOP STEERING
   // ===================================================
 
-  const stopMovement = async () => {
-
-    if (stoppingRef.current) {
-      return;
-    }
-
-    stoppingRef.current = true;
-
-    try {
-
-      const results =
-        await Promise.all([
-          writeCommand(
-            FIREBASE_PATHS.movementCommand,
-            "stop"
-          ),
-
-          writeCommand(
-            FIREBASE_PATHS.steeringCommand,
-            "STOP"
-          ),
-        ]);
-
-      if (!results.every(Boolean)) {
-
-        throw new Error(
-          "Movement stop command failed."
-        );
-
+  const stopSteeringOnly =
+    async () => {
+      if (
+        steeringStoppingRef.current
+      ) {
+        return;
       }
 
-      setDirection(null);
-      setSteeringStatus("STOP");
-      setActiveControl(null);
+      steeringStoppingRef.current =
+        true;
 
-      activeDirectionRef.current =
-        null;
+      try {
+        const success =
+          await writeCommand(
+            FIREBASE_PATHS.steeringCommand,
+            "STOP"
+          );
 
-      setIsConnected(true);
+        if (!success) {
+          return;
+        }
 
-    } catch (error) {
+        activeSteeringRef.current =
+          null;
 
-      console.error(
-        "Movement stop error:",
-        error
-      );
+        setSteeringStatus(
+          "STOP"
+        );
 
-    } finally {
-
-      stoppingRef.current =
-        false;
-
-    }
-  };
+        if (
+          activeMovementRef.current ===
+          "forward"
+        ) {
+          setActiveControl(
+            "forward"
+          );
+        } else if (
+          activeMovementRef.current ===
+          "backward"
+        ) {
+          setActiveControl(
+            "backward"
+          );
+        } else {
+          setActiveControl(null);
+        }
+      } finally {
+        steeringStoppingRef.current =
+          false;
+      }
+    };
 
   // ===================================================
-  // START DIRECTIONAL CONTROL
+  // START MOVEMENT
   // ===================================================
 
-  const startDirectionalControl =
+  const startMovementControl =
     async (
-      directionValue: Direction,
+      movement:
+        | "forward"
+        | "backward",
       pointerId: number
     ) => {
-
       if (
-        activePointerRef.current !==
+        movementPointerRef.current !==
         null
       ) {
         return;
@@ -1166,110 +1352,282 @@ export default function ManualControlScreen() {
 
       if (
         !driveActive ||
-        automaticRunning
+        automaticRunning ||
+        !mowerOnline
       ) {
         return;
       }
 
-      activePointerRef.current =
+      if (
+        obstacleDetected &&
+        movement === "forward"
+      ) {
+        await createNotification(
+          "Obstacle Detected",
+          "Forward movement cannot start while an obstacle is detected.",
+          "warning"
+        );
+
+        return;
+      }
+
+      movementPointerRef.current =
         pointerId;
 
-      activeDirectionRef.current =
-        directionValue;
+      activeMovementRef.current =
+        movement;
 
       setActiveControl(
-        directionValue
+        movement
       );
 
-      if (
-        directionValue === "forward" ||
-        directionValue === "backward"
-      ) {
-
+      const success =
         await moveMower(
-          directionValue
+          movement
         );
 
-      } else if (
-        directionValue === "left"
-      ) {
+      if (!success) {
+        movementPointerRef.current =
+          null;
 
-        await steerMower(
-          "LEFT"
-        );
+        activeMovementRef.current =
+          null;
 
-      } else if (
-        directionValue === "right"
-      ) {
-
-        await steerMower(
-          "RIGHT"
-        );
-
+        setActiveControl(null);
       }
     };
 
   // ===================================================
-  // RELEASE DIRECTIONAL CONTROL
+  // START STEERING
   // ===================================================
 
-  const releaseDirectionalControl =
+  const startSteeringControl =
     async (
-      pointerId?: number
+      steering:
+        | "left"
+        | "right",
+      pointerId: number
     ) => {
-
       if (
-        pointerId !== undefined &&
-        activePointerRef.current !==
-          pointerId
+        steeringPointerRef.current !==
+        null
       ) {
         return;
       }
 
-      activePointerRef.current =
+      if (
+        !driveActive ||
+        automaticRunning ||
+        !mowerOnline
+      ) {
+        return;
+      }
+
+      steeringPointerRef.current =
+        pointerId;
+
+      activeSteeringRef.current =
+        steering;
+
+      setActiveControl(
+        steering
+      );
+
+      const success =
+        await steerMower(
+          steering === "left"
+            ? "LEFT"
+            : "RIGHT"
+        );
+
+      if (!success) {
+        steeringPointerRef.current =
+          null;
+
+        activeSteeringRef.current =
+          null;
+
+        setActiveControl(null);
+      }
+    };
+
+  // ===================================================
+  // RELEASE MOVEMENT
+  // ===================================================
+
+  const releaseMovementControl =
+    async (
+      pointerId: number
+    ) => {
+      if (
+        movementPointerRef.current !==
+        pointerId
+      ) {
+        return;
+      }
+
+      movementPointerRef.current =
         null;
 
-      activeDirectionRef.current =
+      await stopMovementOnly();
+    };
+
+  // ===================================================
+  // RELEASE STEERING
+  // ===================================================
+
+  const releaseSteeringControl =
+    async (
+      pointerId: number
+    ) => {
+      if (
+        steeringPointerRef.current !==
+        pointerId
+      ) {
+        return;
+      }
+
+      steeringPointerRef.current =
         null;
 
-      await stopMovement();
+      await stopSteeringOnly();
+    };
+
+  // ===================================================
+  // BLADES ON
+  // ===================================================
+
+  const engageBlades = async () => {
+    if (automaticRunning) {
+      await createNotification(
+        "Manual Control Locked",
+        "Blade control is disabled while automatic mode is running.",
+        "warning"
+      );
+
+      return;
+    }
+
+    if (!mowerOnline) {
+      await createNotification(
+        "Mower Offline",
+        "The mower is currently offline.",
+        "warning"
+      );
+
+      return;
+    }
+
+    if (!driveActive) {
+      await createNotification(
+        "Drive Required",
+        "Engage the drive before starting the blades.",
+        "warning"
+      );
+
+      return;
+    }
+
+    if (bladesActive) {
+      return;
+    }
+
+    if (obstacleDetected) {
+      await createNotification(
+        "Blades Blocked",
+        "Blades cannot start while an obstacle is detected.",
+        "warning"
+      );
+
+      return;
+    }
+
+    const success =
+      await writeCommand(
+        FIREBASE_PATHS.bladesCommand,
+        "ON"
+      );
+
+    if (!success) {
+      await createNotification(
+        "Blade Command Failed",
+        "Unable to send BLADES ON command.",
+        "error"
+      );
+
+      return;
+    }
+
+    await createNotification(
+      "Blades ON",
+      "Cutting blades have been engaged.",
+      "warning"
+    );
+  };
+
+  // ===================================================
+  // BLADES OFF
+  // ===================================================
+
+  const disengageBlades =
+    async () => {
+      const success =
+        await writeCommand(
+          FIREBASE_PATHS.bladesCommand,
+          "OFF"
+        );
+
+      if (!success) {
+        await createNotification(
+          "Blade Command Failed",
+          "Unable to send BLADES OFF command.",
+          "error"
+        );
+
+        return;
+      }
+
+      await createNotification(
+        "Blades OFF",
+        "Cutting blades have been disengaged.",
+        "system"
+      );
     };
 
   // ===================================================
   // CAMERA SWITCH
   // ===================================================
 
-  const toggleCamera = async () => {
+  const toggleCamera =
+    async () => {
+      const newCamera =
+        currentCamera === "front"
+          ? "rear"
+          : "front";
 
-    const newCamera =
-      currentCamera === "front"
-        ? "rear"
-        : "front";
+      const success =
+        await writeCommand(
+          FIREBASE_PATHS.cameraCommand,
+          newCamera.toUpperCase()
+        );
 
-    const success =
-      await writeCommand(
-        FIREBASE_PATHS.cameraCommand,
-        newCamera.toUpperCase()
+      if (!success) {
+        return;
+      }
+
+      setCurrentCamera(
+        newCamera
       );
 
-    if (!success) {
-      return;
-    }
+      setCameraActive(true);
+      setCameraError(false);
 
-    setCurrentCamera(
-      newCamera
-    );
-
-    setCameraActive(true);
-    setCameraError(false);
-    setIsConnected(true);
-
-    await createNotification(
-      "Camera Switched",
-      `Camera view changed to ${newCamera.toUpperCase()} camera.`,
-      "system"
-    );
-  };
+      await createNotification(
+        "Camera Switched",
+        `Camera changed to ${newCamera.toUpperCase()}.`,
+        "system"
+      );
+    };
 
   // ===================================================
   // CAMERA POWER
@@ -1277,7 +1635,6 @@ export default function ManualControlScreen() {
 
   const toggleCameraPower =
     async () => {
-
       const newState =
         !cameraActive;
 
@@ -1298,44 +1655,64 @@ export default function ManualControlScreen() {
       );
 
       setCameraError(false);
-      setIsConnected(true);
 
       await createNotification(
         newState
           ? "Camera ON"
           : "Camera OFF",
-
         newState
-          ? "Camera feed has been enabled."
-          : "Camera feed has been disabled.",
-
+          ? "Camera feed enabled."
+          : "Camera feed disabled.",
         "system"
       );
     };
+
+  // ===================================================
+  // RETRY CAMERA
+  // ===================================================
+
+  const retryCamera = () => {
+    setCameraError(false);
+
+    setCameraStreamUrl(
+      (current) =>
+        current || DEFAULT_CAMERA_STREAM
+    );
+  };
 
   // ===================================================
   // EMERGENCY STOP
   // ===================================================
 
   const stopMower = async () => {
+    if (
+      emergencyStoppingRef.current
+    ) {
+      return;
+    }
+
+    emergencyStoppingRef.current =
+      true;
 
     try {
-
-      activePointerRef.current =
+      movementPointerRef.current =
         null;
 
-      activeDirectionRef.current =
+      steeringPointerRef.current =
         null;
+
+      activeMovementRef.current =
+        null;
+
+      activeSteeringRef.current =
+        null;
+
+      setActiveControl(null);
 
       const results =
         await Promise.all([
           writeCommand(
             FIREBASE_PATHS.driveCommand,
-            "OFF"
-          ),
-
-          writeCommand(
-            FIREBASE_PATHS.bladesCommand,
             "OFF"
           ),
 
@@ -1350,37 +1727,38 @@ export default function ManualControlScreen() {
           ),
 
           writeCommand(
+            FIREBASE_PATHS.bladesCommand,
+            "OFF"
+          ),
+
+          writeCommand(
             FIREBASE_PATHS.automaticCommand,
             "STOP"
           ),
         ]);
 
-      if (!results.every(Boolean)) {
-
+      if (
+        !results.every(Boolean)
+      ) {
         throw new Error(
-          "One or more emergency stop commands failed."
+          "Emergency stop command failed."
         );
-
       }
 
       setDriveActive(false);
-      setBladesActive(false);
-      setDirection(null);
+      setMovementStatus(null);
       setSteeringStatus("STOP");
+      setBladesActive(false);
       setAutomaticRunning(false);
       setAutomaticStatus("STOPPED");
       setActiveControl(null);
 
-      setIsConnected(true);
-
       await createNotification(
         "Emergency Stop",
-        "Drive, blades, movement, steering, and automatic mode were stopped.",
+        "Drive, movement, steering, blades, and automatic mode were stopped.",
         "error"
       );
-
     } catch (error) {
-
       console.error(
         "Emergency stop error:",
         error
@@ -1388,10 +1766,12 @@ export default function ManualControlScreen() {
 
       await createNotification(
         "Emergency Stop Failed",
-        "One or more mower shutdown commands could not be sent.",
+        "One or more emergency stop commands failed.",
         "error"
       );
-
+    } finally {
+      emergencyStoppingRef.current =
+        false;
     }
   };
 
@@ -1400,18 +1780,13 @@ export default function ManualControlScreen() {
   // ===================================================
 
   if (!authReady) {
-
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
-
         <div className="rounded-2xl bg-white px-6 py-5 shadow-lg">
-
           <span className="text-sm font-semibold text-emerald-800">
             Authenticating Session...
           </span>
-
         </div>
-
       </div>
     );
   }
@@ -1421,30 +1796,19 @@ export default function ManualControlScreen() {
   // ===================================================
 
   return (
-
     <div
-      className="
-        relative
-        z-0
-        min-h-screen
-        overflow-x-hidden
-        pb-28
-        sm:pb-24
-      "
+      className="relative z-0 min-h-screen overflow-x-hidden pb-28 sm:pb-24"
       style={{
         WebkitTapHighlightColor:
           "transparent",
       }}
     >
-
       {/* ================================================= */}
       {/* HEADER */}
       {/* ================================================= */}
 
       <div className="relative z-10 mb-8 flex flex-col justify-between gap-4 rounded-3xl border border-white/60 bg-white/40 p-6 shadow-sm backdrop-blur-md md:flex-row md:items-center">
-
         <div>
-
           <h1 className="flex items-center gap-3 text-2xl font-black uppercase tracking-wider text-[#2C3627] sm:text-3xl">
             Tactical Control
           </h1>
@@ -1452,7 +1816,6 @@ export default function ManualControlScreen() {
           <p className="mt-1 text-xs font-semibold text-[#40513B] sm:text-sm">
             ECOMOW Manual Mower Control
           </p>
-
         </div>
 
         <div
@@ -1462,11 +1825,9 @@ export default function ManualControlScreen() {
               : "border-rose-200 bg-rose-50 text-rose-600"
           }`}
         >
-
-          {isConnected && mowerOnline ? (
-
+          {isConnected &&
+          mowerOnline ? (
             <>
-
               <Wifi className="h-4 w-4 text-emerald-600" />
 
               <span className="text-xs font-black uppercase tracking-widest">
@@ -1474,51 +1835,70 @@ export default function ManualControlScreen() {
               </span>
 
               <span className="h-2.5 w-2.5 animate-ping rounded-full bg-emerald-500" />
-
             </>
-
           ) : (
-
             <>
-
               <WifiOff className="h-4 w-4 text-rose-600" />
 
               <span className="text-xs font-black uppercase tracking-widest">
                 Mower Offline
               </span>
-
             </>
-
           )}
-
         </div>
-
       </div>
+
+      {/* ================================================= */}
+      {/* OBSTACLE WARNING */}
+      {/* ================================================= */}
+
+      {obstacleDetected && (
+        <div className="relative z-30 mb-8 flex items-center gap-4 rounded-3xl border-2 border-red-300 bg-red-50 p-5 shadow-lg">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-600">
+            <ShieldAlert
+              className="h-6 w-6 text-white"
+              strokeWidth={2.5}
+            />
+          </div>
+
+          <div className="flex-1">
+            <p className="text-sm font-black uppercase tracking-wider text-red-700">
+              OBSTACLE DETECTED
+            </p>
+
+            <p className="mt-1 text-xs font-semibold text-red-600">
+              May nakaharang sa mower.
+            </p>
+
+            {obstacleDistance !== null && (
+              <p className="mt-1 text-[10px] font-black text-red-500">
+                Distance: {obstacleDistance} cm
+              </p>
+            )}
+          </div>
+
+          <span className="h-4 w-4 animate-pulse rounded-full bg-red-600" />
+        </div>
+      )}
 
       {/* ================================================= */}
       {/* AUTOMATIC LOCK */}
       {/* ================================================= */}
 
       {automaticRunning && (
-
         <div className="relative z-10 mb-8 flex items-center gap-3 rounded-3xl border border-amber-200 bg-amber-50 p-5">
-
           <LockKeyhole className="h-6 w-6 shrink-0 text-amber-600" />
 
           <div>
-
             <p className="text-sm font-black text-amber-800">
               AUTOMATIC MODE ACTIVE
             </p>
 
             <p className="text-xs font-medium text-amber-700">
-              Manual movement and blade controls are temporarily locked.
+              Manual movement, steering, and blade controls are locked.
             </p>
-
           </div>
-
         </div>
-
       )}
 
       {/* ================================================= */}
@@ -1526,61 +1906,45 @@ export default function ManualControlScreen() {
       {/* ================================================= */}
 
       <div className="relative z-0 grid grid-cols-1 gap-8 lg:grid-cols-12">
-
         {/* ================================================= */}
         {/* LEFT */}
         {/* ================================================= */}
 
         <div className="relative z-0 space-y-8 lg:col-span-7">
-
           {/* ================================================= */}
           {/* CAMERA */}
           {/* ================================================= */}
 
           <div className="relative z-10 rounded-[2.5rem] border border-gray-100 bg-white p-3 shadow-xl sm:p-4">
-
             <div className="relative aspect-video overflow-hidden rounded-[2rem] bg-[#1A2118]">
-
-              {/* CAMERA FEED */}
-
               {cameraActive ? (
-
                 <div className="absolute inset-0 bg-black">
-
                   {cameraStreamUrl &&
                   !cameraError ? (
-
                     <img
-                      key={`${currentCamera}-${cameraActive}-${cameraStreamUrl}`}
+                      key={`${currentCamera}-${cameraStreamUrl}`}
                       src={cameraStreamUrl}
                       alt="ESP32-CAM Live Feed"
                       className="absolute inset-0 h-full w-full object-cover"
                       onLoad={() => {
-
                         console.log(
-                          "ESP32-CAM stream connected:",
+                          "[CAMERA] Stream loaded:",
                           cameraStreamUrl
                         );
 
                         setCameraError(false);
-
                       }}
                       onError={() => {
-
                         console.error(
-                          "ESP32-CAM stream failed:",
+                          "[CAMERA] Stream failed:",
                           cameraStreamUrl
                         );
 
                         setCameraError(true);
-
                       }}
                     />
-
                   ) : (
-
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#101510] px-6 text-center">
-
                       <VideoOff className="mb-4 h-14 w-14 text-red-400" />
 
                       <p className="text-sm font-black uppercase tracking-wider text-white">
@@ -1588,183 +1952,79 @@ export default function ManualControlScreen() {
                       </p>
 
                       <p className="mt-2 text-[10px] font-medium text-white/50">
-                        Waiting for the ESP32-CAM internet stream...
+                        Waiting for ESP32-CAM stream...
                       </p>
 
-                      {!cameraStreamUrl && (
-
-                        <p className="mt-3 rounded-lg bg-black/40 px-3 py-2 text-[10px] text-amber-400">
-                          No stream URL available in Firebase.
-                        </p>
-
-                      )}
-
                       {cameraStreamUrl && (
-
                         <p className="mt-3 max-w-full break-all rounded-lg bg-black/40 px-3 py-2 font-mono text-[10px] text-emerald-400">
                           {cameraStreamUrl}
                         </p>
-
                       )}
 
                       <button
                         type="button"
-                        onClick={() => {
-
-                          setCameraError(false);
-
-                        }}
-                        className="mt-4 rounded-xl bg-emerald-600 px-4 py-2 text-[10px] font-black uppercase text-white hover:bg-emerald-700"
+                        onClick={
+                          retryCamera
+                        }
+                        className="mt-4 rounded-xl bg-emerald-600 px-4 py-2 text-[10px] font-black uppercase text-white"
                       >
                         Retry Camera
                       </button>
-
                     </div>
-
                   )}
 
-                  {/* LIVE INDICATOR */}
-
-                  {!cameraError &&
-                  cameraStreamUrl && (
-
+                  {cameraStreamUrl &&
+                  !cameraError && (
                     <div className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/80 px-3 py-1.5 shadow-lg backdrop-blur-md">
-
                       <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
 
                       <span className="text-[10px] font-black uppercase tracking-widest text-emerald-300">
-                        Live Feed ({currentCamera.toUpperCase()})
+                        Live Feed (
+                        {currentCamera.toUpperCase()}
+                        )
                       </span>
-
                     </div>
-
                   )}
-
                 </div>
-
               ) : (
-
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#101510] text-white/40">
-
                   <VideoOff className="h-14 w-14" />
 
                   <span className="text-xs font-bold uppercase tracking-wider">
                     Camera OFF
                   </span>
-
-                  <span className="text-[10px] text-white/30">
-                    Turn on the camera to view the feed.
-                  </span>
-
                 </div>
-
               )}
 
-              {/* DIRECTION */}
-
-              {direction && (
-
-                <div className="absolute right-4 top-4 z-20 animate-pulse rounded-xl border border-emerald-400/40 bg-emerald-600/90 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg backdrop-blur-md">
-
-                  {direction} Active
-
-                </div>
-
-              )}
-
-              {/* ================================================= */}
               {/* CAMERA CONTROLS */}
-              {/* ================================================= */}
 
-              <div
-                className="
-                  absolute
-                  bottom-4
-                  left-1/2
-                  z-[100]
-                  flex
-                  w-[calc(100%-1rem)]
-                  max-w-[620px]
-                  -translate-x-1/2
-                  flex-wrap
-                  items-center
-                  justify-center
-                  gap-2
-                  rounded-2xl
-                  bg-black/30
-                  p-2
-                  backdrop-blur-sm
-                "
-              >
-
-                {/* SWITCH CAMERA */}
-
+              <div className="absolute bottom-4 left-1/2 z-[100] flex w-[calc(100%-1rem)] max-w-[620px] -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-2xl bg-black/30 p-2 backdrop-blur-sm">
                 <button
                   type="button"
-                  onClick={toggleCamera}
-                  className="
-                    flex
-                    min-h-11
-                    touch-manipulation
-                    select-none
-                    items-center
-                    gap-2
-                    rounded-xl
-                    border
-                    border-white/20
-                    bg-black/80
-                    px-4
-                    py-2.5
-                    text-xs
-                    font-black
-                    text-white
-                    shadow-lg
-                    backdrop-blur-md
-                    transition
-                    hover:bg-black
-                    active:scale-95
-                  "
+                  onClick={
+                    toggleCamera
+                  }
+                  className="flex min-h-11 items-center gap-2 rounded-xl border border-white/20 bg-black/80 px-4 py-2.5 text-xs font-black text-white shadow-lg"
                 >
-
                   <RotateCw className="h-4 w-4 text-emerald-400" />
 
-                  {currentCamera === "front"
+                  {currentCamera ===
+                  "front"
                     ? "REAR CAM"
                     : "FRONT CAM"}
-
                 </button>
-
-                {/* CAMERA POWER */}
 
                 <button
                   type="button"
-                  onClick={toggleCameraPower}
-                  className={`
-                    flex
-                    min-h-11
-                    touch-manipulation
-                    select-none
-                    items-center
-                    gap-2
-                    rounded-xl
-                    border
-                    px-4
-                    py-2.5
-                    text-xs
-                    font-black
-                    text-white
-                    shadow-lg
-                    backdrop-blur-md
-                    transition
-                    active:scale-95
-                    ${
-                      cameraActive
-                        ? "border-emerald-400/40 bg-emerald-700/90 hover:bg-emerald-800"
-                        : "border-red-400/40 bg-red-700/90 hover:bg-red-800"
-                    }
-                  `}
+                  onClick={
+                    toggleCameraPower
+                  }
+                  className={`flex min-h-11 items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-black text-white shadow-lg ${
+                    cameraActive
+                      ? "border-emerald-400/40 bg-emerald-700/90"
+                      : "border-red-400/40 bg-red-700/90"
+                  }`}
                 >
-
                   {cameraActive ? (
                     <Video className="h-4 w-4" />
                   ) : (
@@ -1775,49 +2035,48 @@ export default function ManualControlScreen() {
                   {cameraActive
                     ? "ON"
                     : "OFF"}
-
                 </button>
-
               </div>
-
             </div>
-
           </div>
 
           {/* ================================================= */}
-          {/* DRIVE COMMAND PAD */}
+          {/* DRIVE COMMAND */}
           {/* ================================================= */}
 
           <div className="relative z-30 flex select-none flex-col items-center rounded-[2.5rem] border border-gray-100 bg-white p-6 shadow-xl sm:p-8">
-
             <div className="mb-6 flex w-full items-center justify-between">
-
               <h2 className="text-xs font-black uppercase tracking-[3px] text-[#2C3627]">
                 Drive Command
               </h2>
 
-              {!driveActive && (
-
-                <span className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-600">
-                  Drive Disengaged
-                </span>
-
-              )}
-
+              <span
+                className={`rounded-lg border px-2.5 py-1 text-[10px] font-bold ${
+                  driveActive
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-600"
+                    : "border-amber-200 bg-amber-50 text-amber-600"
+                }`}
+              >
+                {driveActive
+                  ? "Drive Engaged"
+                  : "Drive Disengaged"}
+              </span>
             </div>
+
+            {/* DIRECTION PAD */}
 
             <div
               className="relative z-40 flex h-64 w-64 items-center justify-center sm:h-72 sm:w-72"
               style={{
                 touchAction: "none",
                 userSelect: "none",
-                WebkitUserSelect: "none",
+                WebkitUserSelect:
+                  "none",
               }}
-              onContextMenu={(e) => {
-                e.preventDefault();
-              }}
+              onContextMenu={(e) =>
+                e.preventDefault()
+              }
             >
-
               <div className="pointer-events-none absolute inset-0 rounded-full border-4 border-slate-100 bg-slate-50 shadow-inner" />
 
               {/* FORWARD */}
@@ -1826,30 +2085,39 @@ export default function ManualControlScreen() {
                 type="button"
                 disabled={
                   !driveActive ||
-                  automaticRunning
+                  automaticRunning ||
+                  obstacleDetected ||
+                  !mowerOnline
                 }
                 aria-label="Move forward"
                 className={`pointer-events-auto absolute top-2 z-50 flex h-16 w-16 touch-none select-none items-center justify-center rounded-2xl border shadow-md transition-all active:scale-95 sm:h-20 sm:w-20 ${
-                  activeControl === "forward"
+                  activeControl ===
+                  "forward"
                     ? "border-emerald-500 bg-emerald-500 text-white"
                     : "border-slate-200 bg-white text-[#2C3627]"
                 } ${
                   !driveActive ||
-                  automaticRunning
+                  automaticRunning ||
+                  obstacleDetected ||
+                  !mowerOnline
                     ? "cursor-not-allowed opacity-50"
                     : "cursor-pointer"
                 }`}
                 style={{
-                  touchAction: "none",
+                  touchAction:
+                    "none",
                 }}
-                onPointerDown={async (e) => {
-
+                onPointerDown={async (
+                  e
+                ) => {
                   e.preventDefault();
                   e.stopPropagation();
 
                   if (
                     !driveActive ||
-                    automaticRunning
+                    automaticRunning ||
+                    obstacleDetected ||
+                    !mowerOnline
                   ) {
                     return;
                   }
@@ -1860,52 +2128,36 @@ export default function ManualControlScreen() {
                     );
                   } catch {}
 
-                  await startDirectionalControl(
+                  await startMovementControl(
                     "forward",
                     e.pointerId
                   );
                 }}
-                onPointerUp={async (e) => {
-
+                onPointerUp={async (
+                  e
+                ) => {
                   e.preventDefault();
                   e.stopPropagation();
 
-                  try {
-
-                    if (
-                      e.currentTarget.hasPointerCapture(
-                        e.pointerId
-                      )
-                    ) {
-
-                      e.currentTarget.releasePointerCapture(
-                        e.pointerId
-                      );
-
-                    }
-
-                  } catch {}
-
-                  await releaseDirectionalControl(
+                  await releaseMovementControl(
                     e.pointerId
                   );
                 }}
-                onPointerCancel={async (e) => {
-
+                onPointerCancel={async (
+                  e
+                ) => {
                   e.preventDefault();
                   e.stopPropagation();
 
-                  await releaseDirectionalControl(
+                  await releaseMovementControl(
                     e.pointerId
                   );
                 }}
               >
-
                 <ArrowUp
                   className="h-8 w-8 sm:h-10 sm:w-10"
                   strokeWidth={2.5}
                 />
-
               </button>
 
               {/* RIGHT */}
@@ -1914,30 +2166,36 @@ export default function ManualControlScreen() {
                 type="button"
                 disabled={
                   !driveActive ||
-                  automaticRunning
+                  automaticRunning ||
+                  !mowerOnline
                 }
                 aria-label="Steer right"
                 className={`pointer-events-auto absolute right-2 z-50 flex h-16 w-16 touch-none select-none items-center justify-center rounded-2xl border shadow-md transition-all active:scale-95 sm:h-20 sm:w-20 ${
-                  activeControl === "right"
+                  activeControl ===
+                  "right"
                     ? "border-emerald-500 bg-emerald-500 text-white"
                     : "border-slate-200 bg-white text-[#2C3627]"
                 } ${
                   !driveActive ||
-                  automaticRunning
+                  automaticRunning ||
+                  !mowerOnline
                     ? "cursor-not-allowed opacity-50"
                     : "cursor-pointer"
                 }`}
                 style={{
-                  touchAction: "none",
+                  touchAction:
+                    "none",
                 }}
-                onPointerDown={async (e) => {
-
+                onPointerDown={async (
+                  e
+                ) => {
                   e.preventDefault();
                   e.stopPropagation();
 
                   if (
                     !driveActive ||
-                    automaticRunning
+                    automaticRunning ||
+                    !mowerOnline
                   ) {
                     return;
                   }
@@ -1948,36 +2206,36 @@ export default function ManualControlScreen() {
                     );
                   } catch {}
 
-                  await startDirectionalControl(
+                  await startSteeringControl(
                     "right",
                     e.pointerId
                   );
                 }}
-                onPointerUp={async (e) => {
-
+                onPointerUp={async (
+                  e
+                ) => {
                   e.preventDefault();
                   e.stopPropagation();
 
-                  await releaseDirectionalControl(
+                  await releaseSteeringControl(
                     e.pointerId
                   );
                 }}
-                onPointerCancel={async (e) => {
-
+                onPointerCancel={async (
+                  e
+                ) => {
                   e.preventDefault();
                   e.stopPropagation();
 
-                  await releaseDirectionalControl(
+                  await releaseSteeringControl(
                     e.pointerId
                   );
                 }}
               >
-
                 <ArrowRight
                   className="h-8 w-8 sm:h-10 sm:w-10"
                   strokeWidth={2.5}
                 />
-
               </button>
 
               {/* BACKWARD */}
@@ -1986,30 +2244,36 @@ export default function ManualControlScreen() {
                 type="button"
                 disabled={
                   !driveActive ||
-                  automaticRunning
+                  automaticRunning ||
+                  !mowerOnline
                 }
                 aria-label="Move backward"
                 className={`pointer-events-auto absolute bottom-2 z-50 flex h-16 w-16 touch-none select-none items-center justify-center rounded-2xl border shadow-md transition-all active:scale-95 sm:h-20 sm:w-20 ${
-                  activeControl === "backward"
+                  activeControl ===
+                  "backward"
                     ? "border-emerald-500 bg-emerald-500 text-white"
                     : "border-slate-200 bg-white text-[#2C3627]"
                 } ${
                   !driveActive ||
-                  automaticRunning
+                  automaticRunning ||
+                  !mowerOnline
                     ? "cursor-not-allowed opacity-50"
                     : "cursor-pointer"
                 }`}
                 style={{
-                  touchAction: "none",
+                  touchAction:
+                    "none",
                 }}
-                onPointerDown={async (e) => {
-
+                onPointerDown={async (
+                  e
+                ) => {
                   e.preventDefault();
                   e.stopPropagation();
 
                   if (
                     !driveActive ||
-                    automaticRunning
+                    automaticRunning ||
+                    !mowerOnline
                   ) {
                     return;
                   }
@@ -2020,36 +2284,36 @@ export default function ManualControlScreen() {
                     );
                   } catch {}
 
-                  await startDirectionalControl(
+                  await startMovementControl(
                     "backward",
                     e.pointerId
                   );
                 }}
-                onPointerUp={async (e) => {
-
+                onPointerUp={async (
+                  e
+                ) => {
                   e.preventDefault();
                   e.stopPropagation();
 
-                  await releaseDirectionalControl(
+                  await releaseMovementControl(
                     e.pointerId
                   );
                 }}
-                onPointerCancel={async (e) => {
-
+                onPointerCancel={async (
+                  e
+                ) => {
                   e.preventDefault();
                   e.stopPropagation();
 
-                  await releaseDirectionalControl(
+                  await releaseMovementControl(
                     e.pointerId
                   );
                 }}
               >
-
                 <ArrowDown
                   className="h-8 w-8 sm:h-10 sm:w-10"
                   strokeWidth={2.5}
                 />
-
               </button>
 
               {/* LEFT */}
@@ -2058,30 +2322,36 @@ export default function ManualControlScreen() {
                 type="button"
                 disabled={
                   !driveActive ||
-                  automaticRunning
+                  automaticRunning ||
+                  !mowerOnline
                 }
                 aria-label="Steer left"
                 className={`pointer-events-auto absolute left-2 z-50 flex h-16 w-16 touch-none select-none items-center justify-center rounded-2xl border shadow-md transition-all active:scale-95 sm:h-20 sm:w-20 ${
-                  activeControl === "left"
+                  activeControl ===
+                  "left"
                     ? "border-emerald-500 bg-emerald-500 text-white"
                     : "border-slate-200 bg-white text-[#2C3627]"
                 } ${
                   !driveActive ||
-                  automaticRunning
+                  automaticRunning ||
+                  !mowerOnline
                     ? "cursor-not-allowed opacity-50"
                     : "cursor-pointer"
                 }`}
                 style={{
-                  touchAction: "none",
+                  touchAction:
+                    "none",
                 }}
-                onPointerDown={async (e) => {
-
+                onPointerDown={async (
+                  e
+                ) => {
                   e.preventDefault();
                   e.stopPropagation();
 
                   if (
                     !driveActive ||
-                    automaticRunning
+                    automaticRunning ||
+                    !mowerOnline
                   ) {
                     return;
                   }
@@ -2092,42 +2362,41 @@ export default function ManualControlScreen() {
                     );
                   } catch {}
 
-                  await startDirectionalControl(
+                  await startSteeringControl(
                     "left",
                     e.pointerId
                   );
                 }}
-                onPointerUp={async (e) => {
-
+                onPointerUp={async (
+                  e
+                ) => {
                   e.preventDefault();
                   e.stopPropagation();
 
-                  await releaseDirectionalControl(
+                  await releaseSteeringControl(
                     e.pointerId
                   );
                 }}
-                onPointerCancel={async (e) => {
-
+                onPointerCancel={async (
+                  e
+                ) => {
                   e.preventDefault();
                   e.stopPropagation();
 
-                  await releaseDirectionalControl(
+                  await releaseSteeringControl(
                     e.pointerId
                   );
                 }}
               >
-
                 <ArrowLeft
                   className="h-8 w-8 sm:h-10 sm:w-10"
                   strokeWidth={2.5}
                 />
-
               </button>
 
               {/* CENTER */}
 
               <div className="pointer-events-none relative z-20 flex h-16 w-16 items-center justify-center rounded-full border border-slate-200 bg-slate-100 shadow-inner sm:h-20 sm:w-20">
-
                 <div
                   className={`h-6 w-6 rounded-full ${
                     driveActive
@@ -2135,75 +2404,77 @@ export default function ManualControlScreen() {
                       : "bg-slate-300"
                   }`}
                 />
-
               </div>
-
             </div>
 
-            {/* COMMAND STATUS */}
+            {/* STATUS */}
 
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+            <div className="mt-5 grid w-full grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-slate-50 p-4 text-center">
+                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                  Movement
+                </p>
 
-              <span className="text-[10px] font-semibold text-slate-400">
-                Movement:
-              </span>
+                <p
+                  className={`mt-2 text-lg font-black uppercase ${
+                    movementStatus
+                      ? "text-emerald-600"
+                      : "text-slate-500"
+                  }`}
+                >
+                  {movementStatus ||
+                    "STOP"}
+                </p>
+              </div>
 
-              <span
-                className={`rounded-full px-3 py-1 text-[10px] font-black uppercase ${
-                  direction
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-slate-100 text-slate-600"
-                }`}
-              >
-                {direction || "STOP"}
-              </span>
+              <div className="rounded-2xl bg-slate-50 p-4 text-center">
+                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                  Steering
+                </p>
 
-              <span className="text-[10px] font-semibold text-slate-400">
-                Steering:
-              </span>
-
-              <span
-                className={`rounded-full px-3 py-1 text-[10px] font-black uppercase ${
-                  steeringStatus !== "STOP"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-slate-100 text-slate-600"
-                }`}
-              >
-                {steeringStatus}
-              </span>
-
+                <p
+                  className={`mt-2 text-lg font-black ${
+                    steeringStatus !==
+                    "STOP"
+                      ? "text-emerald-600"
+                      : "text-slate-500"
+                  }`}
+                >
+                  {steeringStatus}
+                </p>
+              </div>
             </div>
 
             <div className="mt-4 text-center">
-
-              {!driveActive ? (
-
-                <p className="text-[10px] font-bold text-amber-600">
-                  ENGAGE DRIVE TO ENABLE MOVEMENT CONTROLS
+              {!mowerOnline ? (
+                <p className="text-[10px] font-black text-red-600">
+                  MOWER OFFLINE — CONTROLS LOCKED
                 </p>
-
+              ) : !driveActive ? (
+                <p className="text-[10px] font-bold text-amber-600">
+                  ENGAGE DRIVE TO ENABLE CONTROLS
+                </p>
+              ) : obstacleDetected ? (
+                <p className="text-[10px] font-black text-red-600">
+                  OBSTACLE DETECTED — FORWARD MOVEMENT LOCKED
+                </p>
               ) : automaticRunning ? (
-
                 <p className="text-[10px] font-bold text-amber-600">
                   AUTOMATIC MODE ACTIVE — MANUAL CONTROL LOCKED
                 </p>
-
               ) : (
-
                 <p className="text-[10px] font-semibold text-emerald-600">
                   MANUAL CONTROL READY
                 </p>
-
               )}
-
             </div>
 
             <p className="mt-3 text-center text-[10px] font-semibold text-slate-400">
-              Press and hold a direction button to move.
+              Hold ↑ / ↓ for movement. Hold ← / → for steering.
+              <br />
+              Movement and steering can operate simultaneously.
             </p>
-
           </div>
-
         </div>
 
         {/* ================================================= */}
@@ -2211,26 +2482,20 @@ export default function ManualControlScreen() {
         {/* ================================================= */}
 
         <div className="relative z-10 space-y-6 lg:col-span-5">
-
           {/* ================================================= */}
           {/* EMERGENCY STOP */}
           {/* ================================================= */}
 
           <div className="rounded-[2rem] border border-red-100 bg-white p-5 shadow-sm sm:p-6">
-
             <div className="mb-5 flex items-center gap-3">
-
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-600">
-
                 <ShieldAlert
                   className="h-6 w-6 text-white"
                   strokeWidth={2.5}
                 />
-
               </div>
 
               <div>
-
                 <h3 className="text-sm font-black uppercase tracking-[3px] text-red-700">
                   Safety Control
                 </h3>
@@ -2238,79 +2503,41 @@ export default function ManualControlScreen() {
                 <p className="mt-1 text-[11px] font-semibold text-red-500">
                   Emergency shutdown system
                 </p>
-
               </div>
-
             </div>
 
             <div className="mb-5 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4">
-
               <ShieldAlert
                 className="mt-0.5 h-5 w-5 shrink-0 text-red-600"
                 strokeWidth={2.5}
               />
 
               <div>
-
                 <p className="text-xs font-black uppercase tracking-wider text-red-700">
                   Emergency Shutdown
                 </p>
 
                 <p className="mt-1 text-[10px] font-medium leading-relaxed text-red-600">
                   Immediately stop all mower systems.
-                  Use this button only when an emergency
-                  or unsafe condition occurs.
                 </p>
-
               </div>
-
             </div>
 
             <button
               type="button"
               onClick={stopMower}
-              aria-label="Emergency stop mower"
-              className="
-                 relative 
-                 isolate
-                 w-full
-                 h-[72px]
-                 overflow-hidden
-                 rounded-full
-                 !bg-red-600
-                 hover:!bg-red-700
-                 active:scale-[0.98]
-                 !text-white
-                 shadow-xl
-                 border-4
-                 border-red-300
-                 transition-all
-                 duration-200
-                 flex
-                 items-center
-                 justify-center
-                 gap-3
-              "
+              className="relative isolate flex h-[72px] w-full items-center justify-center gap-3 overflow-hidden rounded-full border-4 border-red-300 !bg-red-600 !text-white shadow-xl transition-all hover:!bg-red-700 active:scale-[0.98]"
             >
-
-              <div className="absolute inset-0
-              -z-10
-              rounded-full
-              bg-red-500
-              opacity-20
-              animate-pulse" />
+              <div className="absolute inset-0 -z-10 animate-pulse rounded-full bg-red-500 opacity-20" />
 
               <div className="relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-4 border-white bg-red-700">
-
                 <CircleStop
                   className="h-9 w-9 text-white"
                   strokeWidth={2.5}
                 />
-
               </div>
 
               <div className="relative z-10 text-left">
-
                 <p className="text-[11px] font-black tracking-[0.25em]">
                   Emergency
                 </p>
@@ -2322,21 +2549,16 @@ export default function ManualControlScreen() {
                 <p className="text-[9px] font-bold uppercase">
                   Stop all mower systems
                 </p>
-
               </div>
-
             </button>
 
             <div className="mt-5 flex items-center justify-center gap-2">
-
               <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
 
               <span className="text-[9px] font-black uppercase tracking-[2px] text-red-600">
                 Emergency Stop Ready
               </span>
-
             </div>
-
           </div>
 
           {/* ================================================= */}
@@ -2344,9 +2566,7 @@ export default function ManualControlScreen() {
           {/* ================================================= */}
 
           <div className="relative z-20 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
-
             <div className="mb-3 flex items-center justify-between">
-
               <h3 className="text-xs font-black uppercase tracking-[2px] text-[#2C3627]">
                 Drive Relay
               </h3>
@@ -2362,61 +2582,234 @@ export default function ManualControlScreen() {
                   ? "ENGAGED"
                   : "DISENGAGED"}
               </span>
-
             </div>
 
             <div className="space-y-3">
-
               <button
                 type="button"
-                onClick={engageDrive}
+                onClick={
+                  engageDrive
+                }
                 disabled={
                   driveActive ||
-                  automaticRunning
+                  automaticRunning ||
+                  !mowerOnline
                 }
                 className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-black ${
                   driveActive ||
-                  automaticRunning
+                  automaticRunning ||
+                  !mowerOnline
                     ? "cursor-not-allowed bg-[#40513B] text-white opacity-40"
                     : "bg-[#40513B] text-white hover:bg-[#2C3627]"
                 }`}
               >
-
                 <Power className="h-4 w-4" />
 
                 ENGAGE DRIVE
-
               </button>
 
               <button
                 type="button"
-                onClick={disengageDrive}
-                disabled={!driveActive}
+                onClick={
+                  disengageDrive
+                }
+                disabled={
+                  !driveActive
+                }
                 className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border py-4 text-sm font-black ${
                   !driveActive
                     ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"
                     : "border-slate-200 bg-white text-[#2C3627] hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
                 }`}
               >
-
                 <CircleStop className="h-4 w-4" />
 
                 DISENGAGE DRIVE
-
               </button>
-
             </div>
-
           </div>
 
           {/* ================================================= */}
-          {/* CUTTING BLADES */}
+          {/* STEERING */}
           {/* ================================================= */}
 
           <div className="relative z-20 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-xs font-black uppercase tracking-[2px] text-[#2C3627]">
+                Steering
+              </h3>
 
+              <span
+                className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase ${
+                  steeringStatus !==
+                  "STOP"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-600"
+                    : "border-slate-200 bg-slate-100 text-[#40513B]"
+                }`}
+              >
+                {steeringStatus}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {/* LEFT */}
+
+              <button
+                type="button"
+                disabled={
+                  !driveActive ||
+                  automaticRunning ||
+                  !mowerOnline
+                }
+                onPointerDown={async (
+                  e
+                ) => {
+                  e.preventDefault();
+
+                  if (
+                    !driveActive ||
+                    automaticRunning ||
+                    !mowerOnline
+                  ) {
+                    return;
+                  }
+
+                  try {
+                    e.currentTarget.setPointerCapture(
+                      e.pointerId
+                    );
+                  } catch {}
+
+                  await startSteeringControl(
+                    "left",
+                    e.pointerId
+                  );
+                }}
+                onPointerUp={async (
+                  e
+                ) => {
+                  e.preventDefault();
+
+                  await releaseSteeringControl(
+                    e.pointerId
+                  );
+                }}
+                onPointerCancel={async (
+                  e
+                ) => {
+                  e.preventDefault();
+
+                  await releaseSteeringControl(
+                    e.pointerId
+                  );
+                }}
+                className={`flex min-h-16 items-center justify-center gap-2 rounded-2xl border text-sm font-black transition active:scale-95 ${
+                  steeringStatus ===
+                  "LEFT"
+                    ? "border-emerald-500 bg-emerald-500 text-white"
+                    : "border-slate-200 bg-white text-[#2C3627]"
+                } ${
+                  !driveActive ||
+                  automaticRunning ||
+                  !mowerOnline
+                    ? "cursor-not-allowed opacity-40"
+                    : ""
+                }`}
+                style={{
+                  touchAction:
+                    "none",
+                }}
+              >
+                <ArrowLeft className="h-6 w-6" />
+
+                LEFT
+              </button>
+
+              {/* RIGHT */}
+
+              <button
+                type="button"
+                disabled={
+                  !driveActive ||
+                  automaticRunning ||
+                  !mowerOnline
+                }
+                onPointerDown={async (
+                  e
+                ) => {
+                  e.preventDefault();
+
+                  if (
+                    !driveActive ||
+                    automaticRunning ||
+                    !mowerOnline
+                  ) {
+                    return;
+                  }
+
+                  try {
+                    e.currentTarget.setPointerCapture(
+                      e.pointerId
+                    );
+                  } catch {}
+
+                  await startSteeringControl(
+                    "right",
+                    e.pointerId
+                  );
+                }}
+                onPointerUp={async (
+                  e
+                ) => {
+                  e.preventDefault();
+
+                  await releaseSteeringControl(
+                    e.pointerId
+                  );
+                }}
+                onPointerCancel={async (
+                  e
+                ) => {
+                  e.preventDefault();
+
+                  await releaseSteeringControl(
+                    e.pointerId
+                  );
+                }}
+                className={`flex min-h-16 items-center justify-center gap-2 rounded-2xl border text-sm font-black transition active:scale-95 ${
+                  steeringStatus ===
+                  "RIGHT"
+                    ? "border-emerald-500 bg-emerald-500 text-white"
+                    : "border-slate-200 bg-white text-[#2C3627]"
+                } ${
+                  !driveActive ||
+                  automaticRunning ||
+                  !mowerOnline
+                    ? "cursor-not-allowed opacity-40"
+                    : ""
+                }`}
+                style={{
+                  touchAction:
+                    "none",
+                }}
+              >
+                RIGHT
+
+                <ArrowRight className="h-6 w-6" />
+              </button>
+            </div>
+
+            <p className="mt-3 text-center text-[10px] font-semibold text-slate-400">
+              Hold LEFT or RIGHT to steer.
+            </p>
+          </div>
+
+          {/* ================================================= */}
+          {/* BLADES */}
+          {/* ================================================= */}
+
+          <div className="relative z-20 rounded-[2rem] border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
             <div className="mb-3 flex items-center justify-between">
-
               <h3 className="text-xs font-black uppercase tracking-[2px] text-[#2C3627]">
                 Cutting Blades
               </h3>
@@ -2432,95 +2825,71 @@ export default function ManualControlScreen() {
                   ? "ENGAGED"
                   : "STOPPED"}
               </span>
-
             </div>
 
             {!driveActive &&
               !automaticRunning &&
               !bladesActive && (
-
                 <div className="mb-3 flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
-
                   <ShieldAlert className="h-4 w-4 text-[#40513B]" />
 
                   <div>
-
                     <p className="text-[9px] font-black uppercase tracking-wide text-[#40513B]">
                       Drive Required
                     </p>
 
                     <p className="text-[9px] text-slate-400">
-                      Engage the drive before starting the cutting blades.
+                      Engage the drive before starting the blades.
                     </p>
-
                   </div>
-
                 </div>
-
               )}
-
-            {automaticRunning && (
-
-              <div className="mb-3 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-
-                <LockKeyhole className="h-4 w-4 text-amber-600" />
-
-                <div>
-
-                  <p className="text-[9px] font-black uppercase tracking-wide text-amber-800">
-                    Manual Control Locked
-                  </p>
-
-                  <p className="text-[9px] text-amber-600">
-                    Automatic mode currently controls the mower.
-                  </p>
-
-                </div>
-
-              </div>
-
-            )}
 
             <button
               type="button"
-              onClick={engageBlades}
+              onClick={
+                engageBlades
+              }
               disabled={
                 bladesActive ||
                 automaticRunning ||
-                !driveActive
+                !driveActive ||
+                !mowerOnline ||
+                obstacleDetected
               }
               className={`flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl py-4 text-sm font-black ${
                 bladesActive ||
                 automaticRunning ||
-                !driveActive
+                !driveActive ||
+                !mowerOnline ||
+                obstacleDetected
                   ? "cursor-not-allowed bg-[#40513B] text-white opacity-40"
                   : "bg-[#40513B] text-white hover:bg-[#2C3627]"
               }`}
             >
-
               <Scissors className="h-4 w-4" />
 
               ENGAGE BLADES
-
             </button>
 
             <button
               type="button"
-              onClick={disengageBlades}
-              disabled={!bladesActive}
+              onClick={
+                disengageBlades
+              }
+              disabled={
+                !bladesActive
+              }
               className={`mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border py-4 text-sm font-black ${
                 !bladesActive
                   ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"
                   : "border-slate-200 bg-white text-[#2C3627] hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
               }`}
             >
-
               <CircleStop className="h-4 w-4" />
 
               DISENGAGE BLADES
-
             </button>
-
           </div>
 
           {/* ================================================= */}
@@ -2528,20 +2897,18 @@ export default function ManualControlScreen() {
           {/* ================================================= */}
 
           <div className="relative z-20 rounded-[2.5rem] border border-gray-100 bg-white p-6 shadow-xl">
-
             <div className="mb-5 flex items-center justify-between">
-
               <h3 className="text-xs font-black uppercase tracking-widest text-[#2C3627]">
                 System Status
               </h3>
 
-              <span className="text-[10px] font-bold text-slate-400">
+              <span className="text-[10px] font-bold text-emerald-600">
                 REALTIME
               </span>
-
             </div>
 
             <div className="grid grid-cols-2 gap-3">
+              {/* DRIVE */}
 
               <div
                 className={`rounded-2xl p-4 ${
@@ -2550,7 +2917,6 @@ export default function ManualControlScreen() {
                     : "bg-slate-50"
                 }`}
               >
-
                 <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
                   Drive
                 </p>
@@ -2566,8 +2932,9 @@ export default function ManualControlScreen() {
                     ? "ON"
                     : "OFF"}
                 </p>
-
               </div>
+
+              {/* BLADES */}
 
               <div
                 className={`rounded-2xl p-4 ${
@@ -2576,7 +2943,6 @@ export default function ManualControlScreen() {
                     : "bg-slate-50"
                 }`}
               >
-
                 <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
                   Blades
                 </p>
@@ -2592,20 +2958,41 @@ export default function ManualControlScreen() {
                     ? "ON"
                     : "OFF"}
                 </p>
-
               </div>
 
-              <div className="rounded-2xl bg-slate-50 p-4">
+              {/* MOVEMENT */}
 
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                  Movement
+                </p>
+
+                <p className="mt-2 text-lg font-black uppercase text-[#40513B]">
+                  {movementStatus ||
+                    "STOP"}
+                </p>
+              </div>
+
+              {/* STEERING */}
+
+              <div className="rounded-2xl bg-slate-50 p-4">
                 <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
                   Steering
                 </p>
 
-                <p className="mt-2 text-lg font-black text-[#40513B]">
+                <p
+                  className={`mt-2 text-lg font-black ${
+                    steeringStatus !==
+                    "STOP"
+                      ? "text-emerald-600"
+                      : "text-slate-500"
+                  }`}
+                >
                   {steeringStatus}
                 </p>
-
               </div>
+
+              {/* AUTOMATIC */}
 
               <div
                 className={`rounded-2xl p-4 ${
@@ -2614,7 +3001,6 @@ export default function ManualControlScreen() {
                     : "bg-slate-50"
                 }`}
               >
-
                 <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
                   Automatic
                 </p>
@@ -2628,22 +3014,97 @@ export default function ManualControlScreen() {
                 >
                   {automaticStatus}
                 </p>
-
               </div>
 
+              {/* CAMERA */}
+
+              <div
+                className={`rounded-2xl p-4 ${
+                  cameraActive
+                    ? "bg-emerald-50"
+                    : "bg-slate-50"
+                }`}
+              >
+                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                  Camera
+                </p>
+
+                <p
+                  className={`mt-2 text-lg font-black ${
+                    cameraActive
+                      ? "text-emerald-600"
+                      : "text-slate-500"
+                  }`}
+                >
+                  {cameraActive
+                    ? currentCamera.toUpperCase()
+                    : "OFF"}
+                </p>
+              </div>
+
+              {/* OBSTACLE */}
+
+              <div
+                className={`rounded-2xl p-4 ${
+                  obstacleDetected
+                    ? "bg-red-50"
+                    : "bg-emerald-50"
+                }`}
+              >
+                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                  Obstacle
+                </p>
+
+                <p
+                  className={`mt-2 text-lg font-black ${
+                    obstacleDetected
+                      ? "text-red-600"
+                      : "text-emerald-600"
+                  }`}
+                >
+                  {obstacleDetected
+                    ? "DETECTED"
+                    : "CLEAR"}
+                </p>
+
+                {obstacleDistance !== null && (
+                  <p className="mt-1 text-[10px] font-bold text-slate-500">
+                    {obstacleDistance} cm
+                  </p>
+                )}
+              </div>
+
+              {/* MOWER CONNECTION */}
+
+              <div
+                className={`rounded-2xl p-4 ${
+                  mowerOnline
+                    ? "bg-emerald-50"
+                    : "bg-red-50"
+                }`}
+              >
+                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                  Connection
+                </p>
+
+                <p
+                  className={`mt-2 text-lg font-black ${
+                    mowerOnline
+                      ? "text-emerald-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {mowerOnline
+                    ? "ONLINE"
+                    : "OFFLINE"}
+                </p>
+              </div>
             </div>
-
           </div>
-
         </div>
-
       </div>
 
-      <div
-        className="pointer-events-none h-8 w-full sm:h-4"
-        aria-hidden="true"
-      />
-
+      <div className="pointer-events-none h-8 w-full sm:h-4" />
     </div>
   );
 }

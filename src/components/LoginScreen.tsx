@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ShieldCheck, UserPlus } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { Capacitor } from "@capacitor/core";
-
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 
 import {
@@ -38,8 +37,6 @@ interface LoginScreenProps {
 export default function LoginScreen({
   onLogin,
 }: LoginScreenProps) {
-  const navigate = useNavigate();
-
   const [loading, setLoading] = useState(false);
 
   const [error, setError] =
@@ -74,8 +71,25 @@ export default function LoginScreen({
     photoURL: string
   ) => {
     try {
+      const userRef = doc(
+        db,
+        "users",
+        uid
+      );
+
+      /*
+       * IMPORTANT:
+       * merge: true preserves an existing role.
+       *
+       * Therefore, if this user already has:
+       *
+       * role: "admin"
+       *
+       * we DO NOT overwrite it with "user".
+       */
+
       await setDoc(
-        doc(db, "users", uid),
+        userRef,
         {
           uid,
           email,
@@ -88,11 +102,23 @@ export default function LoginScreen({
           merge: true,
         }
       );
+
+      console.log(
+        "User successfully saved to Firestore."
+      );
+
     } catch (error) {
       console.error(
         "Firestore user save error:",
         error
       );
+
+      /*
+       * Do not stop the login here.
+       *
+       * App.tsx will still check the authenticated
+       * Firebase user and Firestore role.
+       */
     }
   };
 
@@ -159,6 +185,15 @@ export default function LoginScreen({
         const photoURL =
           user.photoURL || "";
 
+        console.log(
+          "Firebase authenticated user:",
+          {
+            uid,
+            email,
+            name,
+          }
+        );
+
         // Save user to Firestore
         await saveUserToFirestore(
           uid,
@@ -174,24 +209,22 @@ export default function LoginScreen({
         );
 
         console.log(
-          "Native Google Login successful:",
-          {
-            uid,
-            email,
-            name,
-          }
+          "Native Google Login successful."
         );
 
-        // Update App.tsx
+        /*
+         * IMPORTANT:
+         *
+         * DO NOT navigate to /app here.
+         *
+         * App.tsx has onAuthStateChanged()
+         * and will determine:
+         *
+         * admin -> /admin
+         * user  -> /app
+         */
+
         onLogin();
-
-        // Navigate to application
-        navigate(
-          "/app",
-          {
-            replace: true,
-          }
-        );
 
         return;
       }
@@ -238,6 +271,15 @@ export default function LoginScreen({
       const photoURL =
         user.photoURL || "";
 
+      console.log(
+        "Firebase authenticated user:",
+        {
+          uid,
+          email,
+          name,
+        }
+      );
+
       // Save user to Firestore
       await saveUserToFirestore(
         uid,
@@ -253,24 +295,19 @@ export default function LoginScreen({
       );
 
       console.log(
-        "Web Google Login successful:",
-        {
-          uid,
-          email,
-          name,
-        }
+        "Web Google Login successful."
       );
 
-      // Update App.tsx
+      /*
+       * IMPORTANT:
+       *
+       * Do not navigate manually.
+       *
+       * App.tsx will detect the authenticated user
+       * and check the Firestore role.
+       */
+
       onLogin();
-
-      // Navigate
-      navigate(
-        "/app",
-        {
-          replace: true,
-        }
-      );
 
     } catch (error: any) {
       console.error(
@@ -328,7 +365,6 @@ export default function LoginScreen({
         );
 
       } else {
-
         setError(
           error?.message ||
           "Authentication failed. Please try again."
@@ -466,4 +502,3 @@ export default function LoginScreen({
     </div>
   );
 }
-

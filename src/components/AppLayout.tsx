@@ -11,27 +11,23 @@ import {
   Home,
   Calendar,
   Zap,
-  Bell,
   Plus,
   Wifi,
   Bluetooth,
   RefreshCw,
   X,
   LogOut,
-  Unplug,
   CircleCheck,
   CircleX,
+  Bell,
 } from "lucide-react";
 
-import {
-  motion,
-  AnimatePresence,
-} from "framer-motion";
+import { createPortal } from "react-dom";
 
 import {
   auth,
-  db,
   realtimeDb,
+  db,
 } from "../firebase";
 
 import {
@@ -40,18 +36,17 @@ import {
 } from "firebase/auth";
 
 import {
+  ref,
+  onValue,
+} from "firebase/database";
+
+import {
   collection,
   query,
   where,
   onSnapshot,
-  addDoc,
-  serverTimestamp,
 } from "firebase/firestore";
 
-import {
-  ref,
-  onValue,
-} from "firebase/database";
 
 // =====================================================
 // IMAGES
@@ -59,6 +54,7 @@ import {
 
 const logoImage = "/images/Ecomow.png";
 const bgImage = "/images/mower.jpg";
+
 
 // =====================================================
 // PROPS
@@ -68,8 +64,9 @@ interface AppLayoutProps {
   onLogout: () => Promise<void>;
 }
 
+
 // =====================================================
-// CONNECT MODAL PROPS
+// CONNECT CONTENT PROPS
 // =====================================================
 
 interface ConnectContentProps {
@@ -79,8 +76,9 @@ interface ConnectContentProps {
   close: () => void;
 }
 
+
 // =====================================================
-// CONNECT MODAL
+// CONNECT CONTENT
 // =====================================================
 
 const ConnectContent = ({
@@ -90,22 +88,22 @@ const ConnectContent = ({
   close,
 }: ConnectContentProps) => {
   return (
-    <div>
+    <div className="w-full">
 
-      {/* HEADER */}
+      {/* =================================================
+          HEADER
+      ================================================= */}
 
       <div className="flex items-center justify-between mb-5">
 
         <div>
-
           <h2 className="text-xl font-black text-gray-800">
             Mower Connection
           </h2>
 
           <p className="text-xs text-gray-500 mt-1">
-            Firebase cloud connection
+            ESP32 connection through Firebase
           </p>
-
         </div>
 
         <button
@@ -114,80 +112,118 @@ const ConnectContent = ({
           className="
             w-8
             h-8
-            bg-gray-100
             rounded-full
+            bg-gray-100
             flex
             items-center
             justify-center
             hover:bg-gray-200
             transition
           "
+          aria-label="Close connection popup"
         >
           <X size={18} />
         </button>
 
       </div>
 
+
+      {/* =================================================
+          CONNECTION ITEMS
+      ================================================= */}
+
       <div className="space-y-3">
 
-        {/* FIREBASE */}
+        {/* =================================================
+            ESP32 CONNECTION
+        ================================================= */}
 
-        <div className="
-          flex
-          items-center
-          gap-4
-          w-full
-          border
-          rounded-xl
-          p-4
-        ">
+        <div
+          className="
+            flex
+            items-center
+            gap-4
+            w-full
+            border
+            border-gray-200
+            rounded-2xl
+            p-4
+            bg-white
+          "
+        >
 
-          <Wifi
-            className={
-              connected
-                ? "text-green-600"
-                : "text-gray-400"
-            }
-          />
+          <div
+            className={`
+              w-10
+              h-10
+              rounded-full
+              flex
+              items-center
+              justify-center
+              ${
+                connected
+                  ? "bg-green-100"
+                  : "bg-gray-100"
+              }
+            `}
+          >
+
+            <Wifi
+              size={22}
+              className={
+                connected
+                  ? "text-green-600"
+                  : "text-gray-400"
+              }
+            />
+
+          </div>
+
 
           <div className="flex-1 text-left">
 
             <p className="font-bold text-gray-800">
-              Cloud Connection
+              ESP32 Mower
             </p>
 
-            <p className="text-xs text-gray-500">
-              No same Wi-Fi required
+            <p className="text-xs text-gray-500 mt-1">
+              {connected
+                ? "ESP32 is communicating with Firebase"
+                : "Waiting for ESP32 heartbeat"}
             </p>
 
           </div>
+
 
           {connecting ? (
 
             <RefreshCw
               className="animate-spin text-gray-400"
-              size={20}
+              size={21}
             />
 
           ) : connected ? (
 
             <CircleCheck
               className="text-green-600"
-              size={22}
+              size={24}
             />
 
           ) : (
 
             <CircleX
               className="text-red-500"
-              size={22}
+              size={24}
             />
 
           )}
 
         </div>
 
-        {/* BLUETOOTH */}
+
+        {/* =================================================
+            BLUETOOTH
+        ================================================= */}
 
         <button
           type="button"
@@ -198,14 +234,34 @@ const ConnectContent = ({
             gap-4
             w-full
             border
-            rounded-xl
+            border-gray-200
+            rounded-2xl
             p-4
+            bg-white
             opacity-50
             cursor-not-allowed
           "
         >
 
-          <Bluetooth className="text-gray-400" />
+          <div
+            className="
+              w-10
+              h-10
+              rounded-full
+              bg-gray-100
+              flex
+              items-center
+              justify-center
+            "
+          >
+
+            <Bluetooth
+              size={22}
+              className="text-gray-400"
+            />
+
+          </div>
+
 
           <div className="flex-1 text-left">
 
@@ -213,7 +269,7 @@ const ConnectContent = ({
               Bluetooth
             </p>
 
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-400 mt-1">
               Not required for Firebase control
             </p>
 
@@ -221,7 +277,10 @@ const ConnectContent = ({
 
         </button>
 
-        {/* MESSAGE */}
+
+        {/* =================================================
+            CONNECTION MESSAGE
+        ================================================= */}
 
         {connectMsg && (
 
@@ -248,6 +307,7 @@ const ConnectContent = ({
   );
 };
 
+
 // =====================================================
 // APP LAYOUT
 // =====================================================
@@ -259,23 +319,28 @@ export default function AppLayout({
   const location = useLocation();
   const navigate = useNavigate();
 
-  // =====================================================
+
+  // ===================================================
   // USER
-  // =====================================================
+  // ===================================================
 
   const [user, setUser] =
     useState<User | null>(null);
 
-  // =====================================================
-  // NOTIFICATIONS
-  // =====================================================
 
-  const [notificationCount, setNotificationCount] =
-    useState(0);
+  // ===================================================
+  // NOTIFICATION COUNT
+  // ===================================================
 
-  // =====================================================
+  const [
+    notificationCount,
+    setNotificationCount,
+  ] = useState(0);
+
+
+  // ===================================================
   // CONNECTION
-  // =====================================================
+  // ===================================================
 
   const [connectOpen, setConnectOpen] =
     useState(false);
@@ -283,200 +348,139 @@ export default function AppLayout({
   const [connecting, setConnecting] =
     useState(false);
 
+  /*
+   * IMPORTANT:
+   *
+   * connected = TRUE ONLY WHEN
+   * ESP32 heartbeat is valid.
+   *
+   * Firebase login alone does NOT
+   * make the mower connected.
+   */
   const [connected, setConnected] =
     useState(false);
 
   const [connectMsg, setConnectMsg] =
     useState<string | null>(null);
 
-  // =====================================================
+
+  // ===================================================
   // MOWER
-  // =====================================================
+  // ===================================================
 
   const [mowerOnline, setMowerOnline] =
     useState(false);
 
+  const [mowerLastSeen, setMowerLastSeen] =
+    useState<number | null>(null);
+
   const [driveStatus, setDriveStatus] =
     useState("OFF");
 
-  // =====================================================
-  // AUTH LISTENER
-  // =====================================================
+
+  // ===================================================
+  // FIREBASE AUTH LISTENER
+  // ===================================================
 
   useEffect(() => {
+
+    console.log(
+      "Starting Firebase Auth listener..."
+    );
 
     const unsubscribe =
       onAuthStateChanged(
         auth,
         (currentUser) => {
 
-          setUser(currentUser);
+          console.log(
+            "Firebase Auth user:",
+            currentUser?.email || "No user"
+          );
 
-        }
-      );
+          console.log(
+            "Firebase Auth UID:",
+            currentUser?.uid || "No UID"
+          );
 
-    return () => unsubscribe();
 
-  }, []);
+          // =============================================
+          // USER LOGGED IN
+          // =============================================
 
-  // =====================================================
-  // FIREBASE CONNECTION
-  // =====================================================
+          if (currentUser) {
 
-  useEffect(() => {
+            setUser(currentUser);
 
-    const connectedRef =
-      ref(
-        realtimeDb,
-        ".info/connected"
-      );
-
-    const unsubscribe =
-      onValue(
-        connectedRef,
-        (snapshot) => {
-
-          const firebaseConnected =
-            snapshot.val() === true;
-
-          setConnected(firebaseConnected);
-
-          if (firebaseConnected) {
+            /*
+             * DO NOT set connected = true here.
+             *
+             * User login and ESP32 connection
+             * are two different things.
+             */
 
             setConnectMsg(
-              "Connected to Firebase cloud."
+              "Checking ESP32 connection..."
             );
 
-          } else {
+          }
 
-            setConnectMsg(
-              "No internet connection."
-            );
+
+          // =============================================
+          // USER LOGGED OUT
+          // =============================================
+
+          else {
+
+            setUser(null);
+
+            setConnected(false);
+
+            setMowerOnline(false);
+
+            setMowerLastSeen(null);
+
+            setNotificationCount(0);
+
+            setConnectMsg(null);
 
           }
 
         }
       );
 
-    return () => unsubscribe();
+
+    return () => {
+
+      console.log(
+        "Stopping Firebase Auth listener..."
+      );
+
+      unsubscribe();
+
+    };
 
   }, []);
 
-  // =====================================================
-  // MOWER ONLINE
-  // =====================================================
+
+  // ===================================================
+  // FIREBASE NOTIFICATION LISTENER
+  //
+  // users/{UID}/notifications
+  // read == false
+  // ===================================================
 
   useEffect(() => {
 
-    const onlineRef =
-      ref(
-        realtimeDb,
-        "ecomow/mower/online"
-      );
-
-    const unsubscribe =
-      onValue(
-        onlineRef,
-        (snapshot) => {
-
-          const value =
-            snapshot.val();
-
-          setMowerOnline(
-            value === true
-          );
-
-        }
-      );
-
-    return () => unsubscribe();
-
-  }, []);
-
-  // =====================================================
-  // DRIVE STATUS
-  // =====================================================
-
-  useEffect(() => {
-
-    const driveStatusRef =
-      ref(
-        realtimeDb,
-        "ecomow/mower/drive/status"
-      );
-
-    const unsubscribe =
-      onValue(
-        driveStatusRef,
-        (snapshot) => {
-
-          const value =
-            snapshot.val();
-
-          setDriveStatus(
-            value || "OFF"
-          );
-
-        }
-      );
-
-    return () => unsubscribe();
-
-  }, []);
-
-  // =====================================================
-  // CREATE NOTIFICATION
-  // =====================================================
-
-  const createNotification = async (
-    title: string,
-    description: string,
-    type:
-      | "warning"
-      | "system"
-      | "completed"
-      | "error"
-  ) => {
-
-    if (!user) return;
-
-    try {
-
-      await addDoc(
-        collection(
-          db,
-          "users",
-          user.uid,
-          "notifications"
-        ),
-        {
-          title,
-          description,
-          type,
-          read: false,
-          createdAt:
-            serverTimestamp(),
-        }
-      );
-
-    } catch (error) {
-
-      console.error(
-        "Notification error:",
-        error
-      );
-
-    }
-
-  };
-
-  // =====================================================
-  // NOTIFICATION COUNT
-  // =====================================================
-
-  useEffect(() => {
+    // =================================================
+    // NO USER
+    // =================================================
 
     if (!user) {
+
+      console.log(
+        "No authenticated user."
+      );
 
       setNotificationCount(0);
 
@@ -484,14 +488,54 @@ export default function AppLayout({
 
     }
 
-    const notificationQuery =
+
+    console.log(
+      "=========================================="
+    );
+
+    console.log(
+      "STARTING FIRESTORE NOTIFICATION LISTENER"
+    );
+
+    console.log(
+      "USER UID:",
+      user.uid
+    );
+
+    console.log(
+      "PATH:",
+      `users/${user.uid}/notifications`
+    );
+
+    console.log(
+      "FILTER: read == false"
+    );
+
+    console.log(
+      "=========================================="
+    );
+
+
+    // =================================================
+    // COLLECTION
+    // =================================================
+
+    const notificationsRef =
+      collection(
+        db,
+        "users",
+        user.uid,
+        "notifications"
+      );
+
+
+    // =================================================
+    // UNREAD QUERY
+    // =================================================
+
+    const unreadQuery =
       query(
-        collection(
-          db,
-          "users",
-          user.uid,
-          "notifications"
-        ),
+        notificationsRef,
         where(
           "read",
           "==",
@@ -499,129 +543,540 @@ export default function AppLayout({
         )
       );
 
+
+    // =================================================
+    // REAL-TIME LISTENER
+    // =================================================
+
     const unsubscribe =
       onSnapshot(
-        notificationQuery,
+
+        unreadQuery,
+
         (snapshot) => {
 
+          console.log(
+            "=========================================="
+          );
+
+          console.log(
+            "FIRESTORE NOTIFICATION UPDATE"
+          );
+
+          console.log(
+            "USER UID:",
+            user.uid
+          );
+
+          console.log(
+            "Unread notifications:",
+            snapshot.size
+          );
+
+          console.log(
+            "=========================================="
+          );
+
+
           setNotificationCount(
-            snapshot.docs.length
+            snapshot.size
           );
 
         },
+
         (error) => {
 
           console.error(
-            "Notification listener error:",
+            "=========================================="
+          );
+
+          console.error(
+            "FIRESTORE NOTIFICATION LISTENER ERROR"
+          );
+
+          console.error(
             error
           );
 
+          console.error(
+            "=========================================="
+          );
+
+
+          setNotificationCount(0);
+
         }
       );
 
-    return () => unsubscribe();
+
+    // =================================================
+    // CLEANUP
+    // =================================================
+
+    return () => {
+
+      console.log(
+        "Stopping Firestore notification listener..."
+      );
+
+      unsubscribe();
+
+    };
 
   }, [user]);
 
-  // =====================================================
-  // CONNECT
-  // =====================================================
 
-  const handleConnect = () => {
+  // ===================================================
+  // REAL ESP32 CONNECTION LISTENER
+  //
+  // ESP32 MUST WRITE:
+  //
+  // ecomow/mower/connection/status
+  // ecomow/mower/connection/lastSeen
+  //
+  // Example:
+  //
+  // status:
+  // ONLINE
+  //
+  // lastSeen:
+  // 1787654321000
+  //
+  // lastSeen must be Unix time in MILLISECONDS.
+  // ===================================================
 
-    setConnecting(true);
+  useEffect(() => {
 
-    setConnectMsg(
-      "Checking Firebase connection..."
+    console.log(
+      "=========================================="
     );
 
-    const connectedRef =
+    console.log(
+      "STARTING REAL ESP32 CONNECTION LISTENER"
+    );
+
+    console.log(
+      "=========================================="
+    );
+
+
+    // =================================================
+    // STATUS REFERENCE
+    // =================================================
+
+    const statusRef =
       ref(
         realtimeDb,
-        ".info/connected"
+        "ecomow/mower/connection/status"
       );
 
-    const unsubscribe =
-      onValue(
-        connectedRef,
-        (snapshot) => {
 
-          const firebaseConnected =
-            snapshot.val() === true;
+    // =================================================
+    // LAST SEEN REFERENCE
+    // =================================================
 
-          if (firebaseConnected) {
-
-            setConnected(true);
-
-            setConnectMsg(
-              mowerOnline
-                ? "Mower is online."
-                : "Firebase connected, but mower is offline."
-            );
-
-          } else {
-
-            setConnected(false);
-
-            setConnectMsg(
-              "No internet connection."
-            );
-
-          }
-
-          setConnecting(false);
-
-          unsubscribe();
-
-        }
+    const lastSeenRef =
+      ref(
+        realtimeDb,
+        "ecomow/mower/connection/lastSeen"
       );
 
-  };
 
-  // =====================================================
-  // CLOSE CONNECTION MODAL
-  // =====================================================
+    // =================================================
+    // LOCAL VALUES
+    // =================================================
 
-  const handleDisconnect = () => {
+    let latestStatus = "";
 
-    setConnectOpen(false);
+    let latestLastSeen: number | null = null;
 
-  };
 
-  // =====================================================
-  // LOGOUT
-  // =====================================================
+    // =================================================
+    // UPDATE CONNECTION
+    // =================================================
 
-  const handleLogout = async () => {
+    const updateConnection = () => {
 
-    try {
+      const now =
+        Date.now();
 
-      if (user) {
 
-        await createNotification(
-          "Session Ended",
-          "User logged out of the mower application.",
-          "system"
+      // ===============================================
+      // HEARTBEAT AGE
+      // ===============================================
+
+      const heartbeatAge =
+        latestLastSeen !== null
+          ? now - latestLastSeen
+          : Infinity;
+
+
+      // ===============================================
+      // HEARTBEAT VALID
+      //
+      // 15 seconds timeout
+      // ===============================================
+
+      const heartbeatValid =
+        latestLastSeen !== null &&
+        heartbeatAge >= 0 &&
+        heartbeatAge < 15000;
+
+
+      // ===============================================
+      // STATUS VALID
+      // ===============================================
+
+      const statusValid =
+        latestStatus
+          .trim()
+          .toUpperCase() ===
+        "ONLINE";
+
+
+      // ===============================================
+      // ACTUAL ESP32 CONNECTION
+      // ===============================================
+
+      const isActuallyOnline =
+        statusValid &&
+        heartbeatValid;
+
+
+      // ===============================================
+      // UPDATE STATE
+      // ===============================================
+
+      setConnected(
+        isActuallyOnline
+      );
+
+      setMowerOnline(
+        isActuallyOnline
+      );
+
+      setMowerLastSeen(
+        latestLastSeen
+      );
+
+
+      // ===============================================
+      // MESSAGE
+      // ===============================================
+
+      if (isActuallyOnline) {
+
+        setConnectMsg(
+          "ESP32 CONNECTED — live heartbeat detected."
         );
 
       }
 
-      await onLogout();
+      else if (
+        latestLastSeen !== null &&
+        heartbeatAge >= 15000
+      ) {
 
-    } catch (error) {
+        setConnectMsg(
+          "ESP32 OFFLINE — heartbeat timeout."
+        );
 
-      console.error(
-        "Logout error:",
-        error
+      }
+
+      else {
+
+        setConnectMsg(
+          "ESP32 OFFLINE — waiting for heartbeat."
+        );
+
+      }
+
+
+      // ===============================================
+      // DEBUG
+      // ===============================================
+
+      console.log(
+        "=========================================="
       );
 
-    }
+      console.log(
+        "ESP32 CONNECTION CHECK"
+      );
 
-  };
+      console.log(
+        "Status:",
+        latestStatus
+      );
 
-  // =====================================================
+      console.log(
+        "Last Seen:",
+        latestLastSeen
+      );
+
+      console.log(
+        "Heartbeat Age:",
+        heartbeatAge,
+        "ms"
+      );
+
+      console.log(
+        "Heartbeat Valid:",
+        heartbeatValid
+      );
+
+      console.log(
+        "Status Valid:",
+        statusValid
+      );
+
+      console.log(
+        "ESP32 ONLINE:",
+        isActuallyOnline
+      );
+
+      console.log(
+        "=========================================="
+      );
+
+    };
+
+
+    // =================================================
+    // STATUS LISTENER
+    // =================================================
+
+    const unsubscribeStatus =
+      onValue(
+
+        statusRef,
+
+        (snapshot) => {
+
+          latestStatus =
+            snapshot.exists()
+              ? String(
+                  snapshot.val()
+                )
+              : "";
+
+          console.log(
+            "ESP32 status changed:",
+            latestStatus
+          );
+
+          updateConnection();
+
+        },
+
+        (error) => {
+
+          console.error(
+            "ESP32 status listener error:",
+            error
+          );
+
+          setConnected(false);
+          setMowerOnline(false);
+
+          setConnectMsg(
+            "Unable to read ESP32 status."
+          );
+
+        }
+
+      );
+
+
+    // =================================================
+    // LAST SEEN LISTENER
+    // =================================================
+
+    const unsubscribeLastSeen =
+      onValue(
+
+        lastSeenRef,
+
+        (snapshot) => {
+
+          if (snapshot.exists()) {
+
+            const value =
+              Number(
+                snapshot.val()
+              );
+
+
+            latestLastSeen =
+              Number.isFinite(value)
+                ? value
+                : null;
+
+          }
+
+          else {
+
+            latestLastSeen =
+              null;
+
+          }
+
+
+          console.log(
+            "ESP32 lastSeen changed:",
+            latestLastSeen
+          );
+
+
+          updateConnection();
+
+        },
+
+        (error) => {
+
+          console.error(
+            "ESP32 lastSeen listener error:",
+            error
+          );
+
+          setConnected(false);
+          setMowerOnline(false);
+
+          setConnectMsg(
+            "Unable to read ESP32 heartbeat."
+          );
+
+        }
+
+      );
+
+
+    // =================================================
+    // PERIODIC HEARTBEAT CHECK
+    //
+    // Important:
+    // Kahit walang bagong Firebase event,
+    // mache-check pa rin kung expired na
+    // ang lastSeen.
+    // =================================================
+
+    const interval =
+      window.setInterval(() => {
+
+        updateConnection();
+
+      }, 2000);
+
+
+    // =================================================
+    // CLEANUP
+    // =================================================
+
+    return () => {
+
+      console.log(
+        "Stopping ESP32 connection listener..."
+      );
+
+      unsubscribeStatus();
+
+      unsubscribeLastSeen();
+
+      window.clearInterval(
+        interval
+      );
+
+    };
+
+  }, []);
+
+
+  // ===================================================
+  // DRIVE STATUS LISTENER
+  //
+  // ecomow/mower/drive/status
+  // ===================================================
+
+  useEffect(() => {
+
+    console.log(
+      "Starting drive status listener..."
+    );
+
+
+    const driveStatusRef =
+      ref(
+        realtimeDb,
+        "ecomow/mower/drive/status"
+      );
+
+
+    const unsubscribe =
+      onValue(
+
+        driveStatusRef,
+
+        (snapshot) => {
+
+          if (snapshot.exists()) {
+
+            const value =
+              snapshot.val();
+
+
+            console.log(
+              "Drive status:",
+              value
+            );
+
+
+            setDriveStatus(
+              String(value).toUpperCase()
+            );
+
+          }
+
+          else {
+
+            setDriveStatus(
+              "OFF"
+            );
+
+          }
+
+        },
+
+        (error) => {
+
+          console.error(
+            "Drive status listener error:",
+            error
+          );
+
+          setDriveStatus(
+            "OFF"
+          );
+
+        }
+      );
+
+
+    return () => {
+
+      console.log(
+        "Stopping drive status listener..."
+      );
+
+      unsubscribe();
+
+    };
+
+  }, []);
+
+
+  // ===================================================
   // ACTIVE ROUTE
-  // =====================================================
+  // ===================================================
 
   const isActive = (
     path: string
@@ -630,10 +1085,12 @@ export default function AppLayout({
     if (path === ".") {
 
       return (
-        location.pathname === "/app"
+        location.pathname ===
+        "/app"
       );
 
     }
+
 
     return location.pathname.startsWith(
       `/app/${path}`
@@ -641,30 +1098,511 @@ export default function AppLayout({
 
   };
 
-  // =====================================================
-  // OPEN CONNECT
-  // =====================================================
 
-  const openConnect = () => {
+  // ===================================================
+  // OPEN NOTIFICATIONS
+  // ===================================================
 
-    setConnectOpen(true);
+  const openNotifications = () => {
 
-    handleConnect();
+    console.log(
+      "=========================================="
+    );
+
+    console.log(
+      "🔔 NOTIFICATION BELL CLICKED"
+    );
+
+    console.log(
+      "CURRENT PATH:",
+      location.pathname
+    );
+
+    console.log(
+      "NOTIFICATION COUNT:",
+      notificationCount
+    );
+
+    console.log(
+      "CURRENT USER:",
+      user?.email
+    );
+
+    console.log(
+      "CURRENT UID:",
+      user?.uid
+    );
+
+    console.log(
+      "NAVIGATING TO:",
+      "/app/notifications"
+    );
+
+    console.log(
+      "=========================================="
+    );
+
+
+    navigate(
+      "/app/notifications",
+      {
+        replace: false,
+      }
+    );
 
   };
 
-  // =====================================================
+
+  // ===================================================
+  // LOGOUT
+  // ===================================================
+
+  const handleLogout = async () => {
+
+    try {
+
+      console.log(
+        "Logging out..."
+      );
+
+
+      await onLogout();
+
+
+      console.log(
+        "Logout successful."
+      );
+
+
+      setUser(null);
+
+      setNotificationCount(0);
+
+      setConnected(false);
+
+      setMowerOnline(false);
+
+      setMowerLastSeen(null);
+
+      setConnectMsg(null);
+
+
+      navigate(
+        "/login",
+        {
+          replace: true,
+        }
+      );
+
+    }
+
+    catch (error) {
+
+      console.error(
+        "Logout failed:",
+        error
+      );
+
+    }
+
+  };
+
+
+  // ===================================================
+  // OPEN CONNECTION
+  // ===================================================
+
+  const openConnect = () => {
+
+    console.log(
+      "Opening ESP32 connection popup..."
+    );
+
+
+    setConnectOpen(true);
+
+    setConnecting(true);
+
+
+    // =================================================
+    // CHECK USER AUTH
+    // =================================================
+
+    if (!auth.currentUser) {
+
+      setConnected(false);
+
+      setMowerOnline(false);
+
+      setConnectMsg(
+        "Please login to Firebase first."
+      );
+
+      setConnecting(false);
+
+      return;
+
+    }
+
+
+    // =================================================
+    // CHECK ACTUAL ESP32 STATE
+    // =================================================
+
+    if (mowerOnline) {
+
+      setConnected(true);
+
+      setConnectMsg(
+        "ESP32 CONNECTED — live heartbeat detected."
+      );
+
+    }
+
+    else {
+
+      setConnected(false);
+
+      setConnectMsg(
+        "ESP32 OFFLINE — waiting for heartbeat."
+      );
+
+    }
+
+
+    setConnecting(false);
+
+  };
+
+
+  // ===================================================
+  // CLOSE CONNECTION
+  // ===================================================
+
+  const closeConnect = () => {
+
+    console.log(
+      "Closing connection popup..."
+    );
+
+    setConnectOpen(false);
+
+  };
+
+
+  // ===================================================
+  // CONNECTION POPUP
+  // ===================================================
+
+  const firebasePopup =
+    connectOpen &&
+    typeof document !==
+      "undefined"
+      ? createPortal(
+
+          <div
+            className="
+              fixed
+              inset-0
+              z-[9999999]
+              flex
+              items-center
+              justify-center
+              px-4
+              py-6
+            "
+            style={{
+              position: "fixed",
+              zIndex: 9999999,
+              isolation: "isolate",
+            }}
+          >
+
+            {/* =================================================
+                BACKDROP
+            ================================================= */}
+
+            <div
+              className="
+                fixed
+                inset-0
+                bg-black/50
+                backdrop-blur-sm
+              "
+              style={{
+                zIndex: 9999998,
+              }}
+              onClick={
+                closeConnect
+              }
+            />
+
+
+            {/* =================================================
+                CARD
+            ================================================= */}
+
+            <div
+              className="
+                relative
+                w-full
+                max-w-md
+                max-h-[85vh]
+                overflow-y-auto
+                bg-white
+                rounded-3xl
+                shadow-2xl
+                p-6
+              "
+              style={{
+                zIndex: 9999999,
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+            >
+
+              <ConnectContent
+                connected={connected}
+                connecting={connecting}
+                connectMsg={connectMsg}
+                close={closeConnect}
+              />
+
+
+              {/* =================================================
+                  MOWER STATUS
+              ================================================= */}
+
+              <div
+                className="
+                  mt-5
+                  pt-4
+                  border-t
+                  border-gray-100
+                "
+              >
+
+                <div
+                  className="
+                    flex
+                    items-center
+                    justify-between
+                  "
+                >
+
+                  {/* =================================================
+                      ESP32
+                  ================================================= */}
+
+                  <div>
+
+                    <p
+                      className="
+                        text-xs
+                        text-gray-400
+                      "
+                    >
+                      ESP32 Status
+                    </p>
+
+
+                    <div
+                      className="
+                        flex
+                        items-center
+                        gap-2
+                        mt-1
+                      "
+                    >
+
+                      <span
+                        className={`
+                          w-2.5
+                          h-2.5
+                          rounded-full
+                          ${
+                            mowerOnline
+                              ? "bg-green-500"
+                              : "bg-red-500"
+                          }
+                        `}
+                      />
+
+
+                      <p
+                        className="
+                          font-bold
+                          text-gray-800
+                        "
+                      >
+                        {mowerOnline
+                          ? "CONNECTED"
+                          : "OFFLINE"}
+                      </p>
+
+                    </div>
+
+
+                    {/* =================================================
+                        HEARTBEAT INFO
+                    ================================================= */}
+
+                    {mowerOnline &&
+                      mowerLastSeen !== null && (
+
+                        <p
+                          className="
+                            text-[10px]
+                            text-green-600
+                            mt-1
+                          "
+                        >
+                          Live heartbeat detected
+                        </p>
+
+                      )}
+
+                  </div>
+
+
+                  {/* =================================================
+                      DRIVE
+                  ================================================= */}
+
+                  <div>
+
+                    <p
+                      className="
+                        text-xs
+                        text-gray-400
+                        text-right
+                      "
+                    >
+                      Drive
+                    </p>
+
+
+                    <p
+                      className={`
+                        font-bold
+                        text-right
+                        mt-1
+                        ${
+                          driveStatus ===
+                          "ON"
+                            ? "text-green-600"
+                            : "text-gray-500"
+                        }
+                      `}
+                    >
+                      {driveStatus}
+                    </p>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+
+              {/* =================================================
+                  LAST SEEN
+              ================================================= */}
+
+              {mowerLastSeen !== null && (
+
+                <div
+                  className="
+                    mt-4
+                    p-3
+                    rounded-xl
+                    bg-gray-50
+                    text-xs
+                    text-gray-500
+                  "
+                >
+
+                  <div
+                    className="
+                      flex
+                      justify-between
+                    "
+                  >
+
+                    <span>
+                      Last heartbeat
+                    </span>
+
+                    <span
+                      className="
+                        font-semibold
+                        text-gray-700
+                      "
+                    >
+                      {new Date(
+                        mowerLastSeen
+                      ).toLocaleTimeString()}
+
+                    </span>
+
+                  </div>
+
+                </div>
+
+              )}
+
+
+              {/* =================================================
+                  CLOSE
+              ================================================= */}
+
+              <button
+                type="button"
+                onClick={
+                  closeConnect
+                }
+                className="
+                  w-full
+                  mt-5
+                  py-3
+                  rounded-xl
+                  bg-gray-800
+                  text-white
+                  font-semibold
+                  hover:bg-gray-900
+                  active:scale-[0.98]
+                  transition
+                "
+              >
+                Close
+              </button>
+
+            </div>
+
+          </div>,
+
+          document.body
+
+        )
+      : null;
+
+
+  // ===================================================
   // RENDER
-  // =====================================================
+  // ===================================================
 
   return (
 
-    <div className="
-      relative
-      min-h-screen
-      pb-28
-      md:pb-0
-    ">
+    <div
+      className="
+        relative
+        min-h-screen
+        pb-28
+        md:pb-0
+        overflow-x-hidden
+      "
+    >
 
       {/* =================================================
           BACKGROUND
@@ -677,6 +1615,7 @@ export default function AppLayout({
           z-0
           bg-cover
           bg-center
+          pointer-events-none
         "
         style={{
           backgroundImage:
@@ -686,42 +1625,157 @@ export default function AppLayout({
         }}
       />
 
-      <div className="
-        fixed
-        inset-0
-        z-[1]
-        bg-white/30
-      " />
+
+      <div
+        className="
+          fixed
+          inset-0
+          z-[1]
+          bg-white/30
+          pointer-events-none
+        "
+      />
+
 
       {/* =================================================
-          HEADER
+          MOBILE NOTIFICATION BELL
       ================================================= */}
 
-      <header className="
-        sticky
-        top-0
-        z-50
-      ">
+      <div
+        className="
+          md:hidden
+          fixed
+          pointer-events-auto
+          z-[999999]
+        "
+        style={{
+          position: "fixed",
+          top:
+            "calc(env(safe-area-inset-top, 0px) + 12px)",
+          right: "16px",
+          zIndex: 999999,
+          isolation: "isolate",
+        }}
+      >
 
-        <div className="
-          bg-white/70
-          backdrop-blur-xl
-          border-b
-          border-white/40
-          shadow-sm
-        ">
-
-          <div className="
-            max-w-7xl
-            mx-auto
-            px-6
-            h-16
+        <button
+          type="button"
+          onClick={
+            openNotifications
+          }
+          className="
+            group
+            relative
+            w-12
+            h-12
+            rounded-full
+            bg-white
+            border
+            border-white
+            shadow-[0_8px_30px_rgba(0,0,0,0.20)]
             flex
             items-center
-            justify-between
-          ">
+            justify-center
+            cursor-pointer
+            pointer-events-auto
+            transition-all
+            duration-200
+            hover:scale-105
+            active:scale-90
+          "
+          aria-label="Open notifications"
+        >
 
-            {/* LOGO */}
+          <Bell
+            size={25}
+            strokeWidth={2}
+            className="
+              text-[#40513B]
+              transition-transform
+              duration-200
+              group-hover:scale-110
+            "
+          />
+
+
+          {notificationCount > 0 && (
+
+            <span
+              className="
+                absolute
+                -top-1
+                -right-1
+                min-w-[21px]
+                h-[21px]
+                px-1
+                rounded-full
+                bg-red-500
+                text-white
+                text-[10px]
+                font-black
+                flex
+                items-center
+                justify-center
+                border-2
+                border-white
+                shadow-lg
+                z-[1000000]
+                pointer-events-none
+              "
+            >
+
+              {notificationCount > 99
+                ? "99+"
+                : notificationCount}
+
+            </span>
+
+          )}
+
+        </button>
+
+      </div>
+
+
+      {/* =================================================
+          DESKTOP HEADER
+      ================================================= */}
+
+      <header
+        className="
+          sticky
+          top-0
+          z-50
+          hidden
+          md:block
+        "
+      >
+
+        <div
+          className="
+            bg-white/70
+            backdrop-blur-xl
+            border-b
+            border-white/40
+            shadow-sm
+          "
+        >
+
+          <div
+            className="
+              max-w-7xl
+              mx-auto
+              px-6
+              h-16
+              flex
+              items-center
+              justify-between
+            "
+          >
+
+            {/* =================================================
+                LOGO
+            ================================================= */}
 
             <Link
               to="/app"
@@ -732,16 +1786,18 @@ export default function AppLayout({
               "
             >
 
-              <div className="
-                w-10
-                h-10
-                rounded-full
-                bg-white
-                shadow-md
-                flex
-                items-center
-                justify-center
-              ">
+              <div
+                className="
+                  w-10
+                  h-10
+                  rounded-full
+                  bg-white
+                  shadow-md
+                  flex
+                  items-center
+                  justify-center
+                "
+              >
 
                 <img
                   src={logoImage}
@@ -751,33 +1807,40 @@ export default function AppLayout({
                     rounded-full
                     object-cover
                   "
-                  alt="Solar Mower Logo"
+                  alt="ECOMOW Logo"
                 />
 
               </div>
 
-              <span className="
-                font-bold
-                text-green-700
-                text-lg
-              ">
+
+              <span
+                className="
+                  font-bold
+                  text-green-700
+                  text-lg
+                "
+              >
                 SOLAR MOWER
               </span>
 
             </Link>
 
+
             {/* =================================================
-                DESKTOP NAV
+                DESKTOP NAVIGATION
             ================================================= */}
 
-            <nav className="
-              hidden
-              md:flex
-              items-center
-              gap-8
-              font-semibold
-              text-sm
-            ">
+            <nav
+              className="
+                flex
+                items-center
+                gap-8
+                font-semibold
+                text-sm
+              "
+            >
+
+              {/* HOME */}
 
               <Link
                 to="/app"
@@ -790,6 +1853,9 @@ export default function AppLayout({
                 HOME
               </Link>
 
+
+              {/* SCHEDULE */}
+
               <Link
                 to="/app/schedule"
                 className={`transition ${
@@ -800,6 +1866,9 @@ export default function AppLayout({
               >
                 SCHEDULE
               </Link>
+
+
+              {/* DASHBOARD */}
 
               <Link
                 to="/app/energy"
@@ -812,88 +1881,148 @@ export default function AppLayout({
                 DASHBOARD
               </Link>
 
-            </nav>
 
-            {/* =================================================
-                DESKTOP RIGHT
-            ================================================= */}
+              {/* NOTIFICATIONS */}
 
-            <div className="
-              flex
-              items-center
-              gap-3
-            ">
+              <button
+                type="button"
+                onClick={
+                  openNotifications
+                }
+                className="
+                  relative
+                  flex
+                  items-center
+                  justify-center
+                  w-10
+                  h-10
+                  rounded-full
+                  bg-white/80
+                  hover:bg-white
+                  shadow-sm
+                  transition
+                  active:scale-95
+                  cursor-pointer
+                "
+                aria-label="Open notifications"
+              >
 
-              {/* MOWER STATUS */}
-
-              <div className="
-                hidden
-                md:flex
-                items-center
-                gap-2
-                text-xs
-                font-semibold
-              ">
-
-                <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    mowerOnline
-                      ? "bg-green-500 animate-pulse"
-                      : "bg-red-500"
-                  }`}
+                <Bell
+                  size={21}
+                  strokeWidth={1.8}
+                  className="
+                    text-[#40513B]
+                  "
                 />
 
+
+                {notificationCount > 0 && (
+
+                  <span
+                    className="
+                      absolute
+                      -top-1
+                      -right-1
+                      min-w-[18px]
+                      h-[18px]
+                      px-1
+                      rounded-full
+                      bg-red-500
+                      text-white
+                      text-[9px]
+                      font-black
+                      flex
+                      items-center
+                      justify-center
+                      border-2
+                      border-white
+                      shadow-sm
+                      pointer-events-none
+                    "
+                  >
+
+                    {notificationCount > 99
+                      ? "99+"
+                      : notificationCount}
+
+                  </span>
+
+                )}
+
+              </button>
+
+            </nav>
+
+
+            {/* =================================================
+                RIGHT SIDE
+            ================================================= */}
+
+            <div
+              className="
+                flex
+                items-center
+                gap-3
+              "
+            >
+
+              {/* =================================================
+                  MOWER STATUS
+              ================================================= */}
+
+              <div
+                className="
+                  hidden
+                  lg:flex
+                  items-center
+                  gap-2
+                  px-3
+                  py-2
+                  bg-white/70
+                  rounded-xl
+                "
+              >
+
                 <span
-                  className={
-                    mowerOnline
-                      ? "text-green-600"
-                      : "text-red-500"
-                  }
+                  className={`
+                    w-2.5
+                    h-2.5
+                    rounded-full
+                    ${
+                      mowerOnline
+                        ? "bg-green-500"
+                        : "bg-red-500"
+                    }
+                  `}
+                />
+
+
+                <span
+                  className="
+                    text-xs
+                    font-semibold
+                    text-gray-600
+                  "
                 >
                   {mowerOnline
-                    ? "Mower Online"
-                    : "Mower Offline"}
+                    ? "ESP32 Connected"
+                    : "ESP32 Offline"}
                 </span>
 
               </div>
 
-              {/* CONNECT */}
+
+              {/* =================================================
+                  LOGOUT
+              ================================================= */}
 
               <button
                 type="button"
-                onClick={openConnect}
+                onClick={
+                  handleLogout
+                }
                 className="
-                  hidden
-                  md:flex
-                  items-center
-                  gap-2
-                  px-4
-                  py-2
-                  rounded-xl
-                  bg-green-600
-                  hover:bg-green-700
-                  text-white
-                  text-sm
-                  font-semibold
-                "
-              >
-
-                <Wifi size={16} />
-
-                {connected
-                  ? "Firebase"
-                  : "Connect"}
-
-              </button>
-
-              {/* LOGOUT */}
-
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="
-                  hidden
-                  md:flex
+                  flex
                   items-center
                   gap-2
                   px-4
@@ -904,79 +2033,15 @@ export default function AppLayout({
                   text-white
                   text-sm
                   font-semibold
-                "
-              >
-
-                <LogOut size={16} />
-
-                Logout
-
-              </button>
-
-              {/* NOTIFICATIONS */}
-
-              <button
-                type="button"
-                onClick={() =>
-                  navigate(
-                    "/app/notifications"
-                  )
-                }
-                className="
-                  relative
-                  flex
-                  items-center
-                  gap-2
-                  px-3
-                  py-2
-                  rounded-full
-                  bg-white
-                  shadow
-                  hover:bg-gray-100
                   transition
                 "
               >
 
-                <Bell
-                  size={20}
-                  className="text-green-600"
+                <LogOut
+                  size={16}
                 />
 
-                <span className="
-                  text-sm
-                  font-semibold
-                  text-gray-700
-                ">
-
-                  {notificationCount > 0
-                    ? `${notificationCount} new`
-                    : "0 notif"}
-
-                </span>
-
-                {notificationCount > 0 && (
-
-                  <span className="
-                    absolute
-                    -top-1
-                    -right-1
-                    bg-red-500
-                    text-white
-                    text-xs
-                    w-5
-                    h-5
-                    rounded-full
-                    flex
-                    items-center
-                    justify-center
-                    font-bold
-                  ">
-
-                    {notificationCount}
-
-                  </span>
-
-                )}
+                Logout
 
               </button>
 
@@ -988,24 +2053,28 @@ export default function AppLayout({
 
       </header>
 
+
       {/* =================================================
-          CONTENT
+          MAIN CONTENT
       ================================================= */}
 
       <main
-        className={`relative z-10 transition-all duration-200 ${
-          connectOpen
-            ? "blur-sm"
-            : ""
-        }`}
+        className="
+          relative
+          z-10
+          transition-all
+          duration-200
+        "
       >
 
-        <div className="
-          max-w-7xl
-          mx-auto
-          py-6
-          px-4
-        ">
+        <div
+          className="
+            max-w-7xl
+            mx-auto
+            py-6
+            px-4
+          "
+        >
 
           <Outlet />
 
@@ -1013,211 +2082,237 @@ export default function AppLayout({
 
       </main>
 
+
       {/* =================================================
-          MOBILE NAVIGATION
+          MOBILE BOTTOM NAVIGATION
       ================================================= */}
 
-      <nav className="
-        md:hidden
-        fixed
-        bottom-4
-        left-0
-        right-0
-        z-50
-        px-4
-      ">
-
-        <div className="
-          mx-auto
-          w-full
-          max-w-[380px]
-          h-[68px]
-          bg-white
-          rounded-[1.7rem]
-          shadow-[0_10px_35px_rgba(0,0,0,0.18)]
-          px-4
+      <nav
+        className="
+          md:hidden
+          fixed
+          bottom-6
+          left-0
+          right-0
+          z-50
           flex
-          items-center
-          justify-between
-          border
-          border-white/80
-        ">
+          justify-center
+          px-3
+          pointer-events-auto
+        "
+      >
 
-          {/* =============================================
-              HOME
-          ============================================= */}
+        <div
+          className="
+            bg-white
+            rounded-full
+            shadow-2xl
+            flex
+            items-center
+            justify-center
+            px-4
+            py-3
+            gap-5
+            border
+            border-gray-100
+            w-full
+            max-w-[390px]
+          "
+        >
+
+          {/* HOME */}
 
           <Link
             to="/app"
-            aria-label="Home"
-            className="
-              w-11
-              h-11
+            className={`
+              w-12
+              h-12
+              rounded-full
               flex
               items-center
               justify-center
-              rounded-full
-              transition-all
-              duration-200
-              active:scale-90
-            "
+              transition
+              ${
+                isActive(".")
+                  ? "bg-gray-100"
+                  : ""
+              }
+            `}
+            aria-label="Home"
           >
 
             <Home
-              size={23}
-              strokeWidth={2.2}
+              size={24}
+              strokeWidth={1.5}
               className={
                 isActive(".")
                   ? "text-green-700"
-                  : "text-gray-700"
+                  : "text-gray-600"
               }
             />
 
           </Link>
 
-          {/* =============================================
-              SCHEDULE
-          ============================================= */}
+
+          {/* SCHEDULE */}
 
           <Link
             to="/app/schedule"
-            aria-label="Schedule"
-            className="
-              w-11
-              h-11
+            className={`
+              w-12
+              h-12
+              rounded-full
               flex
               items-center
               justify-center
-              rounded-full
-              transition-all
-              duration-200
-              active:scale-90
-            "
+              transition
+              ${
+                isActive("schedule")
+                  ? "bg-gray-100"
+                  : ""
+              }
+            `}
+            aria-label="Schedule"
           >
 
             <Calendar
-              size={23}
-              strokeWidth={2.2}
+              size={24}
+              strokeWidth={1.5}
               className={
                 isActive("schedule")
                   ? "text-green-700"
-                  : "text-gray-700"
+                  : "text-gray-600"
               }
             />
 
           </Link>
 
-          {/* =============================================
-              CENTER CONNECT
-          ============================================= */}
+
+          {/* CONNECTION */}
 
           <button
             type="button"
-            aria-label="Connect mower"
-            onClick={openConnect}
-            className={`
-              absolute
-              left-1/2
-              -translate-x-1/2
-              -top-7
-              w-[58px]
-              h-[58px]
+            onClick={
+              openConnect
+            }
+            className="
+              relative
+              w-16
+              h-16
+              -mt-8
               rounded-full
+              bg-white
               flex
               items-center
               justify-center
-              bg-white
-              shadow-[0_10px_25px_rgba(0,0,0,0.18)]
-              border
-              border-white
-              transition-all
-              duration-200
-              active:scale-90
-              ${
-                mowerOnline
-                  ? "ring-2 ring-green-500"
-                  : "ring-2 ring-gray-100"
-              }
-            `}
+              shadow-xl
+              border-4
+              border-gray-50
+              transition
+              hover:scale-105
+              active:scale-95
+              flex-shrink-0
+              cursor-pointer
+            "
+            aria-label="Open ESP32 connection"
           >
 
-            {mowerOnline ? (
+            <Plus
+              size={32}
+              strokeWidth={1}
+              className="
+                text-gray-800
+              "
+            />
 
-              <Unplug
-                size={28}
-                strokeWidth={2.2}
-                className="text-green-600"
-              />
 
-            ) : (
+            {/* =================================================
+                SMALL CONNECTION INDICATOR
+            ================================================= */}
 
-              <Plus
-                size={30}
-                strokeWidth={2.2}
-                className="text-gray-700"
-              />
-
-            )}
+            <span
+              className={`
+                absolute
+                top-1
+                right-1
+                w-3
+                h-3
+                rounded-full
+                border-2
+                border-white
+                ${
+                  mowerOnline
+                    ? "bg-green-500"
+                    : "bg-red-500"
+                }
+              `}
+            />
 
           </button>
 
-          {/* =============================================
-              DASHBOARD / ENERGY
-          ============================================= */}
+
+          {/* ENERGY */}
 
           <Link
             to="/app/energy"
-            aria-label="Dashboard"
-            className="
-              w-11
-              h-11
+            className={`
+              w-12
+              h-12
+              rounded-full
               flex
               items-center
               justify-center
-              rounded-full
-              transition-all
-              duration-200
-              active:scale-90
-            "
+              transition
+              ${
+                isActive("energy")
+                  ? "bg-gray-100"
+                  : ""
+              }
+            `}
+            aria-label="Energy dashboard"
           >
 
             <Zap
-              size={25}
-              strokeWidth={2.2}
+              size={24}
+              strokeWidth={1.5}
               className={
                 isActive("energy")
                   ? "text-green-700"
-                  : "text-gray-700"
+                  : "text-gray-600"
               }
             />
 
           </Link>
 
-          {/* =============================================
-              LOGOUT
-          ============================================= */}
+
+          {/* LOGOUT */}
 
           <button
             type="button"
-            aria-label="Logout"
-            onClick={handleLogout}
+            onClick={
+              handleLogout
+            }
             className="
-              w-11
-              h-11
+              w-12
+              h-12
+              rounded-full
               flex
               items-center
               justify-center
-              rounded-full
-              transition-all
-              duration-200
-              active:scale-90
+              transition
+              hover:bg-red-50
+              active:scale-95
+              cursor-pointer
             "
+            aria-label="Logout"
           >
 
             <LogOut
-              size={23}
-              strokeWidth={2.2}
-              className="text-red-500"
+              size={24}
+              strokeWidth={1.5}
+              className="
+                text-red-500
+              "
             />
 
           </button>
@@ -1226,175 +2321,15 @@ export default function AppLayout({
 
       </nav>
 
+
       {/* =================================================
-          CONNECT MODAL
+          ESP32 CONNECTION POPUP
       ================================================= */}
 
-      <AnimatePresence>
-
-        {connectOpen && (
-
-          <>
-
-            {/* OVERLAY */}
-
-            <motion.div
-              className="
-                fixed
-                inset-0
-                bg-black/40
-                z-40
-              "
-              onClick={handleDisconnect}
-              initial={{
-                opacity: 0,
-              }}
-              animate={{
-                opacity: 1,
-              }}
-              exit={{
-                opacity: 0,
-              }}
-            />
-
-            {/* MODAL */}
-
-            <motion.div
-              initial={{
-                scale: 0.85,
-                opacity: 0,
-              }}
-              animate={{
-                scale: 1,
-                opacity: 1,
-              }}
-              exit={{
-                scale: 0.85,
-                opacity: 0,
-              }}
-              className="
-                fixed
-                inset-0
-                z-50
-                flex
-                items-center
-                justify-center
-                p-4
-              "
-            >
-
-              <div className="
-                bg-white
-                rounded-3xl
-                p-6
-                w-full
-                max-w-md
-                shadow-2xl
-              ">
-
-                <ConnectContent
-                  connecting={connecting}
-                  connected={connected}
-                  connectMsg={connectMsg}
-                  close={handleDisconnect}
-                />
-
-                <div className="
-                  mt-5
-                  pt-4
-                  border-t
-                ">
-
-                  {/* FIREBASE */}
-
-                  <div className="
-                    flex
-                    justify-between
-                    text-xs
-                  ">
-
-                    <span className="text-gray-500">
-                      Firebase:
-                    </span>
-
-                    <span
-                      className={
-                        connected
-                          ? "text-green-600 font-bold"
-                          : "text-red-500 font-bold"
-                      }
-                    >
-                      {connected
-                        ? "CONNECTED"
-                        : "OFFLINE"}
-                    </span>
-
-                  </div>
-
-                  {/* MOWER */}
-
-                  <div className="
-                    flex
-                    justify-between
-                    text-xs
-                    mt-2
-                  ">
-
-                    <span className="text-gray-500">
-                      Mower:
-                    </span>
-
-                    <span
-                      className={
-                        mowerOnline
-                          ? "text-green-600 font-bold"
-                          : "text-red-500 font-bold"
-                      }
-                    >
-                      {mowerOnline
-                        ? "ONLINE"
-                        : "OFFLINE"}
-                    </span>
-
-                  </div>
-
-                  {/* DRIVE */}
-
-                  <div className="
-                    flex
-                    justify-between
-                    text-xs
-                    mt-2
-                  ">
-
-                    <span className="text-gray-500">
-                      Drive:
-                    </span>
-
-                    <span
-                      className={
-                        driveStatus === "ON"
-                          ? "text-green-600 font-bold"
-                          : "text-gray-500 font-bold"
-                      }
-                    >
-                      {driveStatus}
-                    </span>
-
-                  </div>
-
-                </div>
-
-              </div>
-
-            </motion.div>
-
-          </>
-
-        )}
-
-      </AnimatePresence>
+      {firebasePopup}
 
     </div>
+
   );
+
 }
