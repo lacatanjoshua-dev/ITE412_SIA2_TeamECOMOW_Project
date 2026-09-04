@@ -42,7 +42,7 @@ import {
 // IMAGES
 // =====================================================
 
-const logoImage = "/images/Ecomow.png";
+const logoImage = "/images/mowerlogo.png";
 const bgImage = "/images/mower.jpg";
 
 // =====================================================
