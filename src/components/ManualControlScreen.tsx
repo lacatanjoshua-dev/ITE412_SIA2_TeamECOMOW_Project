@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-
 import {
   ArrowUp,
   ArrowDown,
@@ -36,9 +35,7 @@ import {
   onValue,
 } from "firebase/database";
 
-// =====================================================
-// TYPES
-// =====================================================
+
 
 type Movement =
   | "forward"
@@ -66,74 +63,56 @@ type NotificationType =
   | "completed"
   | "error";
 
-// =====================================================
-// FIREBASE PATHS
-// =====================================================
-
 const FIREBASE_PATHS = {
   // CONNECTION
   connectionStatus:
     "ecomow/mower/connection/status",
-
   connectionLastSeen:
     "ecomow/mower/connection/lastSeen",
-
   // DRIVE
   driveCommand:
     "ecomow/mower/drive/command",
-
   driveStatus:
     "ecomow/mower/drive/status",
-
   // MOVEMENT
   movementCommand:
     "ecomow/mower/movement/command",
-
   movementStatus:
     "ecomow/mower/movement/status",
-
   // STEERING
   steeringCommand:
     "ecomow/mower/steering/command",
-
   steeringStatus:
     "ecomow/mower/steering/status",
-
   // BLADES
   bladesCommand:
     "ecomow/mower/blades/command",
-
   bladesStatus:
     "ecomow/mower/blades/status",
-
   // AUTOMATIC
   automaticCommand:
     "ecomow/mower/automatic/command",
-
   automaticStatus:
     "ecomow/mower/automatic/status",
 
   // CAMERA
   cameraCommand:
     "ecomow/mower/camera/command",
-
   cameraStatus:
     "ecomow/mower/camera/status",
-
   cameraStreamUrl:
     "ecomow/mower/camera/streamUrl",
 
   // OBSTACLE
   obstacleStatus:
     "ecomow/mower/obstacle/status",
-
   obstacleDistance:
     "ecomow/mower/obstacle/distance",
 };
 
-// =====================================================
+
 // CAMERA FALLBACK
-// =====================================================
+
 
 const DEFAULT_CAMERA_STREAM =
   "http://10.142.135.72/stream";

@@ -27,7 +27,7 @@ import {
   db,
 } from "../firebase";
 
-const logoImage = "/images/mowerlogo.png";
+const logoImage = "/images/LOGO2.0.png";
 const grassBg = "/images/mower.jpg";
 
 interface LoginScreenProps {
@@ -423,11 +423,11 @@ export default function LoginScreen({
 
             {/* LOGO */}
 
-            <div className="w-32 h-32 mx-auto rounded-full bg-white overflow-hidden mb-8 border border-white/30">
+            <div className="w-25 h-25 mx-auto mb-8 flex items-center justify-center">
 
               <img
                 src={logoImage}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain drop-shadow-2xl"
                 alt="Solar Mower Logo"
               />
 

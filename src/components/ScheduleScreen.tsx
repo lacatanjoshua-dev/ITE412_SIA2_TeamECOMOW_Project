@@ -31,9 +31,9 @@ import {
 
 import { auth, db } from "../firebase";
 
-// =========================================================
-// TYPES
-// =========================================================
+/* =========================================================
+   TYPES
+========================================================= */
 
 interface Reservation {
   id: string;
@@ -62,30 +62,30 @@ interface ReservationRequest {
   createdAt: any;
 }
 
-// =========================================================
-// MOWER
-// =========================================================
+/* =========================================================
+   MOWER
+========================================================= */
 
 const MOWER = {
   id: "ECOMOW-001",
   name: "ECOMOW-001",
 };
 
-// =========================================================
-// COMPONENT
-// =========================================================
+/* =========================================================
+   COMPONENT
+========================================================= */
 
-export default function ScheduleScreen() {
-  // =======================================================
-  // AUTH STATE
-  // =======================================================
+const ScheduleScreen: React.FC = () => {
+  /* =======================================================
+     AUTH
+  ======================================================= */
 
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // =======================================================
-  // SCHEDULE STATE
-  // =======================================================
+  /* =======================================================
+     SCHEDULE STATE
+  ======================================================= */
 
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -102,192 +102,131 @@ export default function ScheduleScreen() {
 
   const [msg, setMsg] = useState<string | null>(null);
 
-  // =======================================================
-  // AUTH LISTENER
-  // =======================================================
+  /* =======================================================
+     AUTH LISTENER
+  ======================================================= */
 
   useEffect(() => {
-    console.log("Starting Firebase authentication listener...");
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
 
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      (currentUser) => {
-        console.log(
-          "Firebase Auth user:",
-          currentUser
-            ? {
-                uid: currentUser.uid,
-                email: currentUser.email,
-              }
-            : "NO USER"
-        );
-
-        setUser(currentUser);
-        setAuthLoading(false);
-      },
-      (error) => {
-        console.error(
-          "Firebase authentication error:",
-          error
-        );
-
-        setUser(null);
-        setAuthLoading(false);
-      }
-    );
-
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
-  // =======================================================
-  // DATE HELPERS
-  // =======================================================
+  /* =======================================================
+     DATE HELPERS
+  ======================================================= */
 
   const formatDateForFirebase = (date: Date) => {
     const year = date.getFullYear();
-
-    const month = String(
-      date.getMonth() + 1
-    ).padStart(2, "0");
-
-    const day = String(
-      date.getDate()
-    ).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
 
     return `${year}-${month}-${day}`;
   };
 
-  const selectedDateString = useMemo(
-    () => formatDateForFirebase(selectedDate),
-    [selectedDate]
-  );
+  const selectedDateString = useMemo(() => {
+    return formatDateForFirebase(selectedDate);
+  }, [selectedDate]);
 
   const formattedDate = useMemo(() => {
-    return selectedDate.toLocaleDateString(
-      "en-PH",
-      {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      }
-    );
+    return selectedDate.toLocaleDateString("en-PH", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
   }, [selectedDate]);
 
-  // =======================================================
-  // WEEK DATES
-  // =======================================================
+  /* =======================================================
+     WEEK DATES
+  ======================================================= */
 
   const weekDates = useMemo(() => {
-    const current = new Date(selectedDate);
+    const date = new Date(selectedDate);
 
-    const day = current.getDay();
+    const day = date.getDay();
 
-    const startOfWeek = new Date(current);
+    date.setDate(date.getDate() - day);
 
-    startOfWeek.setDate(
-      current.getDate() - day
-    );
+    return Array.from({ length: 7 }, (_, index) => {
+      const newDate = new Date(date);
 
-    return Array.from(
-      { length: 7 },
-      (_, index) => {
-        const date = new Date(
-          startOfWeek
-        );
+      newDate.setDate(date.getDate() + index);
 
-        date.setDate(
-          startOfWeek.getDate() + index
-        );
-
-        return date;
-      }
-    );
+      return newDate;
+    });
   }, [selectedDate]);
+
+  /* =======================================================
+     CHANGE WEEK
+  ======================================================= */
 
   const changeWeek = (amount: number) => {
     const newDate = new Date(selectedDate);
 
-    newDate.setDate(
-      newDate.getDate() + amount * 7
-    );
+    newDate.setDate(newDate.getDate() + amount * 7);
 
     setSelectedDate(newDate);
   };
 
-  const isSameDate = (
-    date1: Date,
-    date2: Date
-  ) => {
+  /* =======================================================
+     DATE COMPARISON
+  ======================================================= */
+
+  const isSameDate = (a: Date, b: Date) => {
     return (
-      date1.getFullYear() ===
-        date2.getFullYear() &&
-      date1.getMonth() ===
-        date2.getMonth() &&
-      date1.getDate() ===
-        date2.getDate()
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate()
     );
   };
 
   const isPastDate = (date: Date) => {
     const today = new Date();
 
-    today.setHours(
-      0,
-      0,
-      0,
-      0
-    );
+    today.setHours(0, 0, 0, 0);
 
-    const compareDate = new Date(date);
+    const target = new Date(date);
 
-    compareDate.setHours(
-      0,
-      0,
-      0,
-      0
-    );
+    target.setHours(0, 0, 0, 0);
 
-    return compareDate < today;
+    return target < today;
   };
 
-  // =======================================================
-  // DURATION
-  // =======================================================
+  /* =======================================================
+     DURATION
+  ======================================================= */
+
+  const calculateDuration = (
+    start: string,
+    end: string
+  ): number => {
+    const [startHour, startMinute] = start
+      .split(":")
+      .map(Number);
+
+    const [endHour, endMinute] = end
+      .split(":")
+      .map(Number);
+
+    const startTotal =
+      startHour * 60 + startMinute;
+
+    const endTotal =
+      endHour * 60 + endMinute;
+
+    if (endTotal <= startTotal) {
+      return 0;
+    }
+
+    return (endTotal - startTotal) / 60;
+  };
 
   const durationHours = useMemo(() => {
-    if (!startTime || !endTime) {
-      return 0;
-    }
-
-    const [startHour, startMinute] =
-      startTime
-        .split(":")
-        .map(Number);
-
-    const [endHour, endMinute] =
-      endTime
-        .split(":")
-        .map(Number);
-
-    const start =
-      startHour * 60 +
-      startMinute;
-
-    const end =
-      endHour * 60 +
-      endMinute;
-
-    const difference =
-      end - start;
-
-    if (difference <= 0) {
-      return 0;
-    }
-
-    return difference / 60;
+    return calculateDuration(startTime, endTime);
   }, [startTime, endTime]);
 
   const formatDuration = () => {
@@ -295,150 +234,80 @@ export default function ScheduleScreen() {
       return "Invalid";
     }
 
-    return `${durationHours} hour${
-      durationHours !== 1
-        ? "s"
-        : ""
-    }`;
+    if (durationHours === 1) {
+      return "1 hour";
+    }
+
+    return `${durationHours} hours`;
   };
 
-  // =======================================================
-  // LOAD RESERVATIONS
-  // =======================================================
+  /* =======================================================
+     LOAD EXISTING RESERVATIONS
+  ======================================================= */
 
   const loadExistingReservations = async () => {
-    // -----------------------------------------------------
-    // USER CHECK
-    // -----------------------------------------------------
-
     if (!user) {
-      console.warn(
-        "Cannot load reservations: no authenticated user."
-      );
-
       setExistingReservations([]);
       setLoadingReservations(false);
-
       return;
     }
 
     try {
       setLoadingReservations(true);
 
-      console.log(
-        "Loading reservations from Firestore..."
+      const reservationsQuery = query(
+        collection(db, "rentalRequests"),
+        where("mowerId", "==", MOWER.id)
       );
 
-      console.log(
-        "Authenticated UID:",
-        user.uid
-      );
+      const snapshot = await getDocs(reservationsQuery);
 
-      console.log(
-        "Authenticated Email:",
-        user.email
-      );
+      const reservations: Reservation[] =
+        snapshot.docs.map((doc) => {
+          const data = doc.data();
 
-      const reservationsRef =
-        collection(
-          db,
-          "rentalRequests"
-        );
-
-      const q = query(
-        reservationsRef,
-        where(
-          "mowerId",
-          "==",
-          MOWER.id
-        )
-      );
-
-      const snapshot =
-        await getDocs(q);
-
-      const reservations =
-        snapshot.docs.map(
-          (doc) => ({
+          return {
             id: doc.id,
-            ...doc.data(),
-          })
-        ) as Reservation[];
+            userId: data.userId || "",
+            userEmail: data.userEmail || "",
+            mowerId: data.mowerId || "",
+            mowerName: data.mowerName || "",
+            rentalDate: data.rentalDate || "",
+            startTime: data.startTime || "",
+            endTime: data.endTime || "",
+            durationHours:
+              Number(data.durationHours) || 0,
+            status: data.status || "pending",
+            createdAt: data.createdAt,
+          };
+        });
 
-      console.log(
-        "Reservations loaded successfully:",
-        reservations
-      );
+      setExistingReservations(reservations);
 
-      setExistingReservations(
-        reservations
-      );
-
-      // Remove previous error
-      setMsg((currentMsg) => {
-        if (
-          currentMsg ===
-          "Failed to load existing schedules."
-        ) {
-          return null;
-        }
-
-        return currentMsg;
-      });
+      setMsg(null);
     } catch (error: any) {
       console.error(
-        "================================="
-      );
-
-      console.error(
-        "FAILED TO LOAD RESERVATIONS"
-      );
-
-      console.error(
-        "Error:",
+        "Failed to load reservations:",
         error
       );
 
-      console.error(
-        "Error code:",
-        error?.code
-      );
-
-      console.error(
-        "Error message:",
-        error?.message
-      );
-
-      console.error(
-        "================================="
-      );
-
-      setExistingReservations([]);
-
-      if (
-        error?.code ===
-        "permission-denied"
-      ) {
+      if (error?.code === "permission-denied") {
         setMsg(
-          "❌ Firestore permission denied. Please check your Firebase Firestore Rules."
+          "Permission denied while loading schedules."
         );
       } else if (
-        error?.code ===
-        "failed-precondition"
+        error?.code === "failed-precondition"
       ) {
         setMsg(
-          "❌ Firestore is not ready. Please check your Firebase project and Firestore database."
+          "Firestore query requires an index. Please check the Firebase console."
         );
-      } else if (
-        error?.code ===
-        "unavailable"
-      ) {
+      } else if (error?.code === "unavailable") {
         setMsg(
-          "❌ Firebase is temporarily unavailable. Check your internet connection."
+          "Firebase is temporarily unavailable."
         );
       } else {
         setMsg(
-          "❌ Failed to load existing schedules."
+          "Failed to load existing schedules."
         );
       }
     } finally {
@@ -446,28 +315,19 @@ export default function ScheduleScreen() {
     }
   };
 
-  // =======================================================
-  // LOAD RESERVATIONS AFTER AUTH
-  // =======================================================
+  /* =======================================================
+     LOAD WHEN AUTH IS READY
+  ======================================================= */
 
   useEffect(() => {
-    if (authLoading) {
-      return;
+    if (!authLoading) {
+      loadExistingReservations();
     }
+  }, [user, authLoading]);
 
-    if (!user) {
-      setExistingReservations([]);
-      setLoadingReservations(false);
-
-      return;
-    }
-
-    loadExistingReservations();
-  }, [authLoading, user]);
-
-  // =======================================================
-  // TIME OVERLAP
-  // =======================================================
+  /* =======================================================
+     TIME OVERLAP
+  ======================================================= */
 
   const isTimeOverlapping = (
     startA: string,
@@ -475,96 +335,57 @@ export default function ScheduleScreen() {
     startB: string,
     endB: string
   ) => {
-    const [
-      startAHour,
-      startAMinute,
-    ] = startA
-      .split(":")
-      .map(Number);
+    const convertToMinutes = (time: string) => {
+      const [hours, minutes] =
+        time.split(":").map(Number);
 
-    const [
-      endAHour,
-      endAMinute,
-    ] = endA
-      .split(":")
-      .map(Number);
+      return hours * 60 + minutes;
+    };
 
-    const [
-      startBHour,
-      startBMinute,
-    ] = startB
-      .split(":")
-      .map(Number);
+    const aStart = convertToMinutes(startA);
+    const aEnd = convertToMinutes(endA);
 
-    const [
-      endBHour,
-      endBMinute,
-    ] = endB
-      .split(":")
-      .map(Number);
+    const bStart = convertToMinutes(startB);
+    const bEnd = convertToMinutes(endB);
 
-    const startAValue =
-      startAHour * 60 +
-      startAMinute;
-
-    const endAValue =
-      endAHour * 60 +
-      endAMinute;
-
-    const startBValue =
-      startBHour * 60 +
-      startBMinute;
-
-    const endBValue =
-      endBHour * 60 +
-      endBMinute;
-
-    return (
-      startAValue < endBValue &&
-      endAValue > startBValue
-    );
+    return aStart < bEnd && aEnd > bStart;
   };
 
-  // =======================================================
-  // CHECK CONFLICT
-  // =======================================================
+  /* =======================================================
+     CHECK CONFLICT
+  ======================================================= */
 
   const hasConflict = useMemo(() => {
     if (durationHours <= 0) {
       return false;
     }
 
-    return existingReservations.some(
-      (reservation) => {
-        // Ignore inactive reservations
-        if (
-          reservation.status ===
-            "rejected" ||
-          reservation.status ===
-            "cancelled" ||
-          reservation.status ===
-            "completed"
-        ) {
-          return false;
-        }
+    return existingReservations.some((reservation) => {
+      const status =
+        reservation.status.toLowerCase();
 
-        // Different date
-        if (
-          reservation.rentalDate !==
-          selectedDateString
-        ) {
-          return false;
-        }
-
-        // Check time overlap
-        return isTimeOverlapping(
-          startTime,
-          endTime,
-          reservation.startTime,
-          reservation.endTime
-        );
+      if (
+        status === "rejected" ||
+        status === "cancelled" ||
+        status === "completed"
+      ) {
+        return false;
       }
-    );
+
+      if (
+        reservation.rentalDate !==
+        selectedDateString
+      ) {
+        return false;
+      }
+
+      return isTimeOverlapping(
+        startTime,
+        endTime,
+        reservation.startTime,
+        reservation.endTime
+      );
+    });
   }, [
     existingReservations,
     selectedDateString,
@@ -573,79 +394,70 @@ export default function ScheduleScreen() {
     durationHours,
   ]);
 
-  // =======================================================
-  // BROWSER NOTIFICATION PERMISSION
-  // =======================================================
+  /* =======================================================
+     NOTIFICATION PERMISSION
+  ======================================================= */
 
   const requestNotificationPermission =
     async () => {
-      if (
-        !("Notification" in window)
-      ) {
-        return;
-      }
-
-      if (
-        Notification.permission ===
-        "default"
-      ) {
-        try {
-          await Notification.requestPermission();
-        } catch (error) {
-          console.error(
-            "Notification permission error:",
-            error
-          );
+      try {
+        if (
+          typeof window === "undefined" ||
+          !("Notification" in window)
+        ) {
+          return;
         }
+
+        if (
+          Notification.permission ===
+          "default"
+        ) {
+          await Notification.requestPermission();
+        }
+      } catch (error) {
+        console.warn(
+          "Notification permission error:",
+          error
+        );
       }
     };
 
-  // =======================================================
-  // BROWSER NOTIFICATION
-  // =======================================================
+  /* =======================================================
+     BROWSER NOTIFICATION
+  ======================================================= */
 
   const sendBrowserNotification = (
     title: string,
     body: string
   ) => {
-    if (
-      !("Notification" in window)
-    ) {
-      return;
-    }
-
-    if (
-      Notification.permission ===
-      "granted"
-    ) {
-      try {
+    try {
+      if (
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
         new Notification(title, {
           body,
-          icon: "/favicon.ico",
         });
-      } catch (error) {
-        console.error(
-          "Browser notification error:",
-          error
-        );
       }
+    } catch (error) {
+      console.warn(
+        "Browser notification error:",
+        error
+      );
     }
   };
 
-  // =======================================================
-  // FIREBASE USER NOTIFICATION
-  // =======================================================
+  /* =======================================================
+     CREATE FIREBASE NOTIFICATION
+  ======================================================= */
 
   const createNotification = async (
     title: string,
     description: string
   ) => {
     if (!user) {
-      console.warn(
-        "No authenticated user. Notification not created."
-      );
-
-      return false;
+      return;
     }
 
     try {
@@ -658,213 +470,81 @@ export default function ScheduleScreen() {
         ),
         {
           userId: user.uid,
-
-          userEmail:
-            user.email || "",
-
+          userEmail: user.email || "",
           title,
-
           description,
-
           type: "schedule",
-
           read: false,
-
-          createdAt:
-            serverTimestamp(),
+          createdAt: serverTimestamp(),
         }
       );
-
-      console.log(
-        "Notification created successfully."
-      );
-
-      return true;
-    } catch (error: any) {
+    } catch (error) {
       console.error(
-        "Notification creation error:",
+        "Failed to create notification:",
         error
       );
-
-      console.error(
-        "Notification error code:",
-        error?.code
-      );
-
-      console.error(
-        "Notification error message:",
-        error?.message
-      );
-
-      return false;
     }
   };
 
-  // =======================================================
-  // SUBMIT SCHEDULE
-  // =======================================================
+  /* =======================================================
+     SUBMIT SCHEDULE
+  ======================================================= */
 
   const submitSchedule = async () => {
     setMsg(null);
 
-    // -----------------------------------------------------
-    // CHECK USER
-    // -----------------------------------------------------
-
     if (!user) {
       setMsg(
-        "❌ Please log in first."
+        "Please sign in before requesting a schedule."
       );
 
       return;
     }
 
-    // -----------------------------------------------------
-    // CHECK DATE
-    // -----------------------------------------------------
-
-    if (
-      isPastDate(selectedDate)
-    ) {
+    if (isPastDate(selectedDate)) {
       setMsg(
-        "❌ You cannot select a date in the past."
+        "You cannot schedule the mower on a past date."
       );
 
       return;
     }
-
-    // -----------------------------------------------------
-    // CHECK TIME
-    // -----------------------------------------------------
 
     if (durationHours <= 0) {
       setMsg(
-        "❌ End time must be later than start time."
+        "Please select a valid start and end time."
       );
 
       return;
     }
-
-    // -----------------------------------------------------
-    // CHECK CONFLICT
-    // -----------------------------------------------------
 
     if (hasConflict) {
       setMsg(
-        "❌ This schedule is already occupied by another user."
+        "The selected time overlaps with an existing schedule."
       );
 
       return;
     }
-
-    // -----------------------------------------------------
-    // START SAVING
-    // -----------------------------------------------------
 
     try {
       setSaving(true);
 
-      console.log(
-        "================================="
-      );
-
-      console.log(
-        "SAVING SCHEDULE"
-      );
-
-      console.log(
-        "User UID:",
-        user.uid
-      );
-
-      console.log(
-        "User Email:",
-        user.email
-      );
-
-      console.log(
-        "Mower:",
-        MOWER.id
-      );
-
-      console.log(
-        "Date:",
-        selectedDateString
-      );
-
-      console.log(
-        "Time:",
-        startTime,
-        "-",
-        endTime
-      );
-
-      console.log(
-        "Duration:",
-        durationHours
-      );
-
-      console.log(
-        "================================="
-      );
-
-      // ---------------------------------------------------
-      // DATA TO FIREBASE
-      // ---------------------------------------------------
-
-      const scheduleData:
-        ReservationRequest = {
+      const scheduleData: ReservationRequest = {
         userId: user.uid,
-
-        userEmail:
-          user.email || "",
-
-        mowerId:
-          MOWER.id,
-
-        mowerName:
-          MOWER.name,
-
-        rentalDate:
-          selectedDateString,
-
+        userEmail: user.email || "",
+        mowerId: MOWER.id,
+        mowerName: MOWER.name,
+        rentalDate: selectedDateString,
         startTime,
-
         endTime,
-
         durationHours,
-
         status: "pending",
-
-        createdAt:
-          serverTimestamp(),
+        createdAt: serverTimestamp(),
       };
 
-      // ---------------------------------------------------
-      // SAVE TO rentalRequests
-      // ---------------------------------------------------
-
-      const reservationRef =
-        await addDoc(
-          collection(
-            db,
-            "rentalRequests"
-          ),
-          scheduleData
-        );
-
-      console.log(
-        "Schedule saved successfully."
+      await addDoc(
+        collection(db, "rentalRequests"),
+        scheduleData
       );
-
-      console.log(
-        "Reservation ID:",
-        reservationRef.id
-      );
-
-      // ---------------------------------------------------
-      // CREATE USER NOTIFICATION
-      // ---------------------------------------------------
 
       const title =
         "Schedule Request Submitted";
@@ -880,67 +560,31 @@ export default function ScheduleScreen() {
         description
       );
 
-      // ---------------------------------------------------
-      // BROWSER NOTIFICATION
-      // ---------------------------------------------------
-
       sendBrowserNotification(
         title,
         description
       );
 
-      // ---------------------------------------------------
-      // SUCCESS MESSAGE
-      // ---------------------------------------------------
-
       setMsg(
         "✅ Schedule request submitted successfully. Please wait for admin approval."
       );
 
-      // ---------------------------------------------------
-      // RELOAD RESERVATIONS
-      // ---------------------------------------------------
-
       await loadExistingReservations();
-
     } catch (error: any) {
       console.error(
-        "================================="
-      );
-
-      console.error(
-        "SCHEDULE SAVE ERROR"
-      );
-
-      console.error(
-        "Error:",
+        "Failed to submit schedule:",
         error
       );
 
-      console.error(
-        "Error code:",
-        error?.code
-      );
-
-      console.error(
-        "Error message:",
-        error?.message
-      );
-
-      console.error(
-        "================================="
-      );
-
       if (
-        error?.code ===
-        "permission-denied"
+        error?.code === "permission-denied"
       ) {
         setMsg(
-          "❌ Permission denied by Firestore. Please check your Firestore Rules."
+          "Permission denied. Please check your Firebase Firestore rules."
         );
       } else {
         setMsg(
-          "❌ Failed to submit schedule request. Please try again."
+          "Failed to submit schedule. Please try again."
         );
       }
     } finally {
@@ -948,129 +592,410 @@ export default function ScheduleScreen() {
     }
   };
 
-  // =======================================================
-  // AUTH LOADING
-  // =======================================================
+  /* =======================================================
+     AUTH LOADING
+  ======================================================= */
 
   if (authLoading) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F4F6F1] flex items-center justify-center px-6">
         <div className="text-center">
+          <div
+            className="
+              w-10
+              h-10
+              border-4
+              border-[#40513B]/20
+              border-t-[#40513B]
+              rounded-full
+              animate-spin
+              mx-auto
+              mb-4
+            "
+          />
 
-          <div className="w-10 h-10 border-4 border-[#628141]/20 border-t-[#628141] rounded-full animate-spin mx-auto" />
-
-          <p className="mt-4 text-sm font-bold text-[#6D7C66]">
-            Checking account...
+          <p className="text-sm font-bold text-[#40513B]">
+            Loading scheduler...
           </p>
-
         </div>
       </div>
     );
   }
 
-  // =======================================================
-  // NO USER
-  // =======================================================
+  /* =======================================================
+     NO USER
+  ======================================================= */
 
   if (!user) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F4F6F1] flex items-center justify-center px-6">
+        <div
+          className="
+            max-w-md
+            w-full
+            bg-white
+            rounded-[2rem]
+            p-8
+            shadow-xl
+            border
+            border-[#DDE4D8]
+            text-center
+          "
+        >
+          <div
+            className="
+              w-16
+              h-16
+              rounded-2xl
+              bg-[#40513B]/10
+              flex
+              items-center
+              justify-center
+              mx-auto
+              mb-5
+            "
+          >
+            <Shield
+              size={30}
+              className="text-[#40513B]"
+            />
+          </div>
 
-        <div className="text-center bg-white rounded-3xl p-8 shadow-lg">
-
-          <AlertCircle
-            size={40}
-            className="mx-auto text-red-500"
-          />
-
-          <h2 className="mt-4 text-xl font-black text-[#40513B]">
-            Login Required
+          <h2 className="text-xl font-black text-[#2C3627]">
+            Sign In Required
           </h2>
 
-          <p className="mt-2 text-sm text-[#6D7C66]">
-            Please log in before creating a schedule.
+          <p className="text-sm text-[#6D7C66] mt-2">
+            Please sign in to request a mower schedule.
           </p>
-
         </div>
-
       </div>
     );
   }
 
-  // =======================================================
-  // UI
-  // =======================================================
+  /* =======================================================
+     MAIN UI
+  ======================================================= */
 
   return (
-    <div className="w-full">
+    <div className="min-h-screen bg-[#F4F6F1] px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
-      {/* =================================================
-          HEADER
-      ================================================= */}
+      <div className="max-w-7xl mx-auto">
 
-      <header className="mb-6 sm:mb-8">
+        {/* =================================================
+            HEADER
+        ================================================= */}
 
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5">
+        <header className="mb-6 sm:mb-8">
 
-          <div>
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
 
-            <div className="flex items-center gap-2 mb-2">
+            <div>
 
-              <span className="w-2 h-2 rounded-full bg-[#628141]" />
+              <div className="flex items-center gap-2 mb-2">
 
-              <span className="text-[10px] font-black uppercase tracking-[3px] text-[#628141]">
-                ECOMOW Scheduler
-              </span>
+                <div
+                  className="
+                    w-9
+                    h-9
+                    rounded-xl
+                    bg-[#40513B]
+                    flex
+                    items-center
+                    justify-center
+                  "
+                >
+                  <Calendar
+                    size={19}
+                    className="text-white"
+                  />
+                </div>
+
+                <span
+                  className="
+                    text-xs
+                    font-black
+                    uppercase
+                    tracking-[2px]
+                    text-[#6D7C66]
+                  "
+                >
+                  ECOMOW Scheduler
+                </span>
+
+              </div>
+
+              <h1
+                className="
+                  text-3xl
+                  sm:text-4xl
+                  font-black
+                  tracking-tight
+                  text-[#2C3627]
+                "
+              >
+                Schedule
+              </h1>
+
+              <p
+                className="
+                  mt-2
+                  text-sm
+                  sm:text-base
+                  text-[#6D7C66]
+                  max-w-2xl
+                "
+              >
+                Choose your preferred date and time
+                for the ECOMOW smart lawn mower.
+              </p>
 
             </div>
 
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#40513B] tracking-tight">
-              Schedule
-            </h1>
+            <div
+              className="
+                bg-white
+                border
+                border-[#DDE4D8]
+                rounded-2xl
+                px-4
+                py-3
+                shadow-sm
+              "
+            >
 
-            <p className="mt-2 text-sm sm:text-base text-[#6D7C66] font-medium max-w-xl">
-              Plan when you want to use your ECOMOW mower.
-              Select your preferred date and operating time.
-            </p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#8A9684]">
+                Logged in account
+              </p>
 
-            {/* CURRENT ACCOUNT */}
-
-            <div className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[#628141]/10 border border-[#628141]/20">
-
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-
-              <span className="text-[10px] font-bold text-[#40513B]">
-                Logged in as:
-              </span>
-
-              <span className="text-[10px] font-black text-[#628141]">
-                {user.email || "User"}
-              </span>
+              <p className="text-sm font-bold text-[#40513B] mt-1 break-all">
+                {user.email || "Authenticated User"}
+              </p>
 
             </div>
 
           </div>
 
-          <div className="hidden sm:flex items-center gap-3 bg-white/80 backdrop-blur-xl border border-white/70 rounded-2xl px-4 py-3 shadow-sm">
+        </header>
 
-            <div className="w-10 h-10 rounded-xl bg-[#628141]/10 flex items-center justify-center">
+        {/* =================================================
+            SELECTED DATE CARD
+        ================================================= */}
 
-              <Calendar
-                size={20}
-                className="text-[#628141]"
-              />
+        <section
+          className="
+            bg-[#40513B]
+            rounded-[2rem]
+            p-5
+            sm:p-7
+            mb-6
+            shadow-xl
+            shadow-[#40513B]/15
+            text-white
+          "
+        >
 
-            </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
 
             <div>
 
-              <p className="text-[9px] uppercase tracking-widest font-black text-[#6D7C66]">
+              <p
+                className="
+                  text-[10px]
+                  sm:text-xs
+                  font-black
+                  uppercase
+                  tracking-[2px]
+                  text-white/60
+                  mb-2
+                "
+              >
                 Selected Date
               </p>
 
+              <h2
+                className="
+                  text-2xl
+                  sm:text-3xl
+                  font-black
+                "
+              >
+                {formattedDate}
+              </h2>
+
+            </div>
+
+            <div
+              className="
+                w-14
+                h-14
+                rounded-2xl
+                bg-white/10
+                flex
+                items-center
+                justify-center
+              "
+            >
+              <Calendar size={27} />
+            </div>
+
+          </div>
+
+        </section>
+
+        {/* =================================================
+            MESSAGE
+        ================================================= */}
+
+        {msg && (
+          <div
+            className={`
+              mb-6
+              rounded-2xl
+              border
+              px-4
+              py-4
+              flex
+              items-start
+              gap-3
+              ${
+                msg.startsWith("✅")
+                  ? "bg-green-50 border-green-200 text-green-800"
+                  : "bg-red-50 border-red-200 text-red-800"
+              }
+            `}
+          >
+
+            {msg.startsWith("✅") ? (
+              <CheckCircle2
+                size={20}
+                className="shrink-0 mt-0.5"
+              />
+            ) : (
+              <AlertCircle
+                size={20}
+                className="shrink-0 mt-0.5"
+              />
+            )}
+
+            <p className="text-sm font-bold">
+              {msg}
+            </p>
+
+          </div>
+        )}
+
+        {/* =================================================
+            CALENDAR
+        ================================================= */}
+
+        <section
+          className="
+            bg-white
+            border
+            border-[#DDE4D8]
+            rounded-[2rem]
+            p-5
+            sm:p-7
+            shadow-sm
+            mb-6
+          "
+        >
+
+          <div
+            className="
+              flex
+              flex-col
+              sm:flex-row
+              sm:items-center
+              sm:justify-between
+              gap-4
+              mb-6
+            "
+          >
+
+            <div>
+
+              <div className="flex items-center gap-2">
+
+                <Calendar
+                  size={20}
+                  className="text-[#40513B]"
+                />
+
+                <h2 className="font-black text-lg text-[#2C3627]">
+                  Calendar
+                </h2>
+
+              </div>
+
+              <p className="text-xs text-[#8A9684] mt-1">
+                Select your preferred rental date.
+              </p>
+
+            </div>
+
+            <button
+              onClick={() =>
+                setSelectedDate(new Date())
+              }
+              className="
+                px-4
+                py-2.5
+                rounded-xl
+                bg-[#F0F3ED]
+                text-[#40513B]
+                text-xs
+                font-black
+                uppercase
+                tracking-wider
+                hover:bg-[#E4EADF]
+                transition
+              "
+            >
+              Today
+            </button>
+
+          </div>
+
+          <div className="flex items-center justify-between gap-3 mb-5">
+
+            <button
+              onClick={() => changeWeek(-1)}
+              className="
+                w-10
+                h-10
+                rounded-xl
+                border
+                border-[#DDE4D8]
+                flex
+                items-center
+                justify-center
+                text-[#40513B]
+                hover:bg-[#F4F6F1]
+                transition
+              "
+            >
+              <ChevronLeft size={20} />
+            </button>
+
+            <div className="text-center">
+
+              <p className="text-xs font-black uppercase tracking-wider text-[#8A9684]">
+                Week
+              </p>
+
               <p className="text-sm font-black text-[#40513B]">
-                {selectedDate.toLocaleDateString(
-                  "en-US",
+                {weekDates[0].toLocaleDateString(
+                  "en-PH",
+                  {
+                    month: "short",
+                    day: "numeric",
+                  }
+                )}{" "}
+                -{" "}
+                {weekDates[6].toLocaleDateString(
+                  "en-PH",
                   {
                     month: "short",
                     day: "numeric",
@@ -1081,114 +1006,37 @@ export default function ScheduleScreen() {
 
             </div>
 
+            <button
+              onClick={() => changeWeek(1)}
+              className="
+                w-10
+                h-10
+                rounded-xl
+                border
+                border-[#DDE4D8]
+                flex
+                items-center
+                justify-center
+                text-[#40513B]
+                hover:bg-[#F4F6F1]
+                transition
+              "
+            >
+              <ChevronRight size={20} />
+            </button>
+
           </div>
 
-        </div>
-
-        {/* MESSAGE */}
-
-        {msg && (
           <div
-            className={`mt-5 p-4 rounded-2xl text-sm font-bold flex gap-3 items-start shadow-sm ${
-              msg.includes("✅")
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : "bg-red-50 text-red-700 border border-red-200"
-            }`}
+            className="
+              grid
+              grid-cols-7
+              gap-2
+              sm:gap-3
+            "
           >
 
-            {msg.includes("✅") ? (
-              <CheckCircle2
-                size={20}
-                className="flex-shrink-0"
-              />
-            ) : (
-              <AlertCircle
-                size={20}
-                className="flex-shrink-0"
-              />
-            )}
-
-            <span>{msg}</span>
-
-          </div>
-        )}
-
-      </header>
-
-      {/* =================================================
-          CALENDAR
-      ================================================= */}
-
-      <section className="bg-white/95 backdrop-blur-xl rounded-[2rem] sm:rounded-[2.5rem] p-4 sm:p-6 lg:p-8 shadow-lg border border-white/80 mb-6">
-
-        <div className="flex items-center justify-between gap-3 mb-6">
-
-          <div>
-
-            <div className="flex items-center gap-2">
-
-              <Calendar
-                size={17}
-                className="text-[#628141]"
-              />
-
-              <h2 className="text-lg sm:text-xl font-black text-[#40513B]">
-                {selectedDate.toLocaleDateString(
-                  "en-US",
-                  {
-                    month: "long",
-                    year: "numeric",
-                  }
-                )}
-              </h2>
-
-            </div>
-
-            <p className="text-xs text-[#6D7C66] font-bold mt-1">
-              Choose your schedule date
-            </p>
-
-          </div>
-
-          <div className="flex items-center gap-2">
-
-            <button
-              onClick={() =>
-                changeWeek(-1)
-              }
-              className="w-10 h-10 rounded-xl bg-[#F8FAF7] border border-[#E5D9B6]/50 flex items-center justify-center text-[#40513B] hover:bg-[#628141]/10 active:scale-95 transition"
-            >
-              <ChevronLeft size={18} />
-            </button>
-
-            <button
-              onClick={() =>
-                setSelectedDate(
-                  new Date()
-                )
-              }
-              className="hidden sm:flex px-4 h-10 rounded-xl bg-[#40513B] text-white text-xs font-black items-center justify-center hover:bg-[#2C3627] active:scale-95 transition"
-            >
-              Today
-            </button>
-
-            <button
-              onClick={() =>
-                changeWeek(1)
-              }
-              className="w-10 h-10 rounded-xl bg-[#F8FAF7] border border-[#E5D9B6]/50 flex items-center justify-center text-[#40513B] hover:bg-[#628141]/10 active:scale-95 transition"
-            >
-              <ChevronRight size={18} />
-            </button>
-
-          </div>
-
-        </div>
-
-        <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-
-          {weekDates.map(
-            (date) => {
+            {weekDates.map((date) => {
 
               const selected =
                 isSameDate(
@@ -1196,689 +1044,958 @@ export default function ScheduleScreen() {
                   selectedDate
                 );
 
-              const today =
-                isSameDate(
-                  date,
-                  new Date()
-                );
-
               const past =
                 isPastDate(date);
 
               return (
                 <button
-                  key={date.toISOString()}
-                  onClick={() =>
-                    !past &&
-                    setSelectedDate(
-                      date
-                    )
-                  }
+                  key={formatDateForFirebase(date)}
                   disabled={past}
+                  onClick={() =>
+                    setSelectedDate(date)
+                  }
                   className={`
-                    min-w-0 rounded-2xl p-2 sm:p-4
-                    border transition-all duration-200
+                    min-w-0
+                    rounded-2xl
+                    p-2
+                    sm:p-3
+                    border
+                    transition-all
                     ${
                       selected
-                        ? "bg-[#40513B] border-[#40513B] text-white shadow-lg shadow-[#40513B]/20 scale-[1.02]"
+                        ? "bg-[#40513B] border-[#40513B] text-white shadow-lg"
                         : past
-                        ? "bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed"
-                        : "bg-[#F8FAF7] border-transparent text-[#40513B] hover:border-[#628141]/30 hover:bg-[#628141]/10"
+                        ? "bg-[#F6F7F5] border-[#E8ECE5] text-[#B4BCB0] cursor-not-allowed"
+                        : "bg-white border-[#DDE4D8] text-[#40513B] hover:bg-[#F4F6F1]"
                     }
                   `}
                 >
 
-                  <div className="text-[8px] sm:text-[10px] font-black uppercase tracking-wider">
+                  <span
+                    className={`
+                      block
+                      text-[9px]
+                      sm:text-[10px]
+                      font-black
+                      uppercase
+                      tracking-wider
+                      ${
+                        selected
+                          ? "text-white/60"
+                          : ""
+                      }
+                    `}
+                  >
                     {date.toLocaleDateString(
-                      "en-US",
+                      "en-PH",
                       {
-                        weekday:
-                          "short",
+                        weekday: "short",
                       }
                     )}
-                  </div>
+                  </span>
 
-                  <div className="text-lg sm:text-2xl font-black mt-1">
+                  <span
+                    className="
+                      block
+                      text-lg
+                      sm:text-xl
+                      font-black
+                      mt-1
+                    "
+                  >
                     {date.getDate()}
-                  </div>
+                  </span>
 
-                  {today && (
-                    <div
-                      className={`text-[7px] sm:text-[9px] font-black mt-1 tracking-wider ${
+                  <span
+                    className={`
+                      block
+                      text-[8px]
+                      sm:text-[9px]
+                      font-bold
+                      ${
                         selected
-                          ? "text-[#D9E8C8]"
-                          : "text-[#628141]"
-                      }`}
-                    >
-                      TODAY
-                    </div>
-                  )}
+                          ? "text-white/60"
+                          : "text-[#8A9684]"
+                      }
+                    `}
+                  >
+                    {date.toLocaleDateString(
+                      "en-PH",
+                      {
+                        month: "short",
+                      }
+                    )}
+                  </span>
 
                 </button>
               );
-            }
-          )}
-
-        </div>
-
-      </section>
-
-      {/* =================================================
-          MAIN GRID
-      ================================================= */}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* =================================================
-            TIME SELECTION
-        ================================================= */}
-
-        <section className="lg:col-span-2 bg-white/95 backdrop-blur-xl rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-7 lg:p-8 shadow-lg border border-white/80">
-
-          <div className="flex items-center justify-between gap-3 mb-7">
-
-            <div className="flex items-center gap-3">
-
-              <div className="w-11 h-11 rounded-2xl bg-[#628141]/10 flex items-center justify-center">
-
-                <Clock
-                  size={21}
-                  className="text-[#628141]"
-                />
-
-              </div>
-
-              <div>
-
-                <h2 className="font-black text-[#40513B] text-lg">
-                  Select Time
-                </h2>
-
-                <p className="text-xs text-[#6D7C66] font-medium">
-                  {formattedDate}
-                </p>
-
-              </div>
-
-            </div>
-
-            {durationHours > 0 &&
-              !hasConflict && (
-                <div className="hidden sm:flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-xl">
-
-                  <Check size={13} />
-
-                  Available
-
-                </div>
-              )}
+            })}
 
           </div>
-
-          {/* TIME INPUTS */}
-
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-end gap-3">
-
-            <div>
-
-              <label className="block text-[9px] font-black text-[#6D7C66] uppercase tracking-[2px] mb-2">
-                Start Time
-              </label>
-
-              <div className="relative">
-
-                <Clock
-                  size={17}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-[#628141]"
-                />
-
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) =>
-                    setStartTime(
-                      e.target.value
-                    )
-                  }
-                  className="w-full pl-11 pr-4 py-4 rounded-2xl bg-[#F8FAF7] border border-[#E5D9B6]/60 text-[#40513B] font-black text-lg focus:outline-none focus:ring-2 focus:ring-[#628141]/30 focus:border-[#628141]/40 transition"
-                />
-
-              </div>
-
-            </div>
-
-            <div className="hidden sm:flex w-10 h-10 mb-1 rounded-full bg-[#628141]/10 items-center justify-center">
-
-              <ArrowRight
-                size={18}
-                className="text-[#628141]"
-              />
-
-            </div>
-
-            <div>
-
-              <label className="block text-[9px] font-black text-[#6D7C66] uppercase tracking-[2px] mb-2">
-                End Time
-              </label>
-
-              <div className="relative">
-
-                <Clock
-                  size={17}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-[#628141]"
-                />
-
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) =>
-                    setEndTime(
-                      e.target.value
-                    )
-                  }
-                  className="w-full pl-11 pr-4 py-4 rounded-2xl bg-[#F8FAF7] border border-[#E5D9B6]/60 text-[#40513B] font-black text-lg focus:outline-none focus:ring-2 focus:ring-[#628141]/30 focus:border-[#628141]/40 transition"
-                />
-
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* DURATION */}
-
-          <div className="mt-5 p-5 rounded-2xl bg-[#40513B] text-white flex items-center justify-between gap-4">
-
-            <div className="flex items-center gap-3">
-
-              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-
-                <Timer size={19} />
-
-              </div>
-
-              <div>
-
-                <p className="text-[9px] uppercase tracking-[2px] font-black text-white/60">
-                  Total Duration
-                </p>
-
-                <p className="text-sm font-bold text-white/90">
-                  Estimated operating time
-                </p>
-
-              </div>
-
-            </div>
-
-            <span className="text-xl sm:text-2xl font-black text-white text-right">
-              {formatDuration()}
-            </span>
-
-          </div>
-
-          {/* SELECTED SCHEDULE */}
-
-          <div className="mt-5 p-5 rounded-2xl border border-[#E5D9B6]/60 bg-white">
-
-            <div className="flex items-start gap-3">
-
-              <div className="w-10 h-10 rounded-xl bg-[#628141]/10 flex items-center justify-center flex-shrink-0">
-
-                <Calendar
-                  size={18}
-                  className="text-[#628141]"
-                />
-
-              </div>
-
-              <div>
-
-                <p className="text-[9px] uppercase tracking-[2px] font-black text-[#6D7C66]">
-                  Selected Schedule
-                </p>
-
-                <p className="font-black text-[#40513B] mt-1">
-                  {formattedDate}
-                </p>
-
-                <div className="flex items-center gap-2 mt-1">
-
-                  <span className="text-sm font-black text-[#628141]">
-                    {startTime}
-                  </span>
-
-                  <ArrowRight
-                    size={14}
-                    className="text-[#6D7C66]"
-                  />
-
-                  <span className="text-sm font-black text-[#628141]">
-                    {endTime}
-                  </span>
-
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* CONFLICT */}
-
-          {hasConflict && (
-            <div className="mt-4 p-4 rounded-2xl bg-red-50 border border-red-200 flex gap-3">
-
-              <AlertCircle
-                size={19}
-                className="text-red-600 flex-shrink-0"
-              />
-
-              <div>
-
-                <p className="text-sm font-black text-red-700">
-                  Time slot unavailable
-                </p>
-
-                <p className="text-xs text-red-600 mt-1">
-                  Another reservation already occupies this time period.
-                </p>
-
-              </div>
-
-            </div>
-          )}
 
         </section>
 
         {/* =================================================
-            RIGHT SIDE
+            REQUEST SCHEDULE BUTTON
         ================================================= */}
 
-        <div className="space-y-6">
+        <section className="mb-6 sm:mb-8">
 
-          {/* MOWER */}
+          <button
+            onClick={async () => {
+              await requestNotificationPermission();
+              await submitSchedule();
+            }}
+            disabled={
+              saving ||
+              !user ||
+              durationHours <= 0 ||
+              hasConflict ||
+              isPastDate(selectedDate)
+            }
+            className="
+              w-full
+              py-10
+              rounded-[2rem]
+              bg-[#40513B]
+              bg-[#40513B]
+              text-white
+              font-black
+              uppercase
+              tracking-[2px]
+              text-lg
+              shadow-xl
+              shadow-[#40513B]/20
+              hover:bg-[#2C3627]
+              active:scale-[0.99]
+              transition-all
+              duration-200
+              disabled:opacity-40
+              disabled:cursor-not-allowed
+            "
+          >
 
-          <section className="bg-white/95 backdrop-blur-xl rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-7 shadow-lg border border-white/80">
+            {saving ? (
+              <span className="flex items-center justify-center gap-3">
 
-            <div className="flex items-center justify-between mb-5">
+                <span
+                  className="
+                    w-5
+                    h-5
+                    border-2
+                    border-white/40
+                    border-t-white
+                    rounded-full
+                    animate-spin
+                  "
+                />
 
-              <div className="flex items-center gap-3">
+                Saving Schedule...
 
-                <div className="w-11 h-11 rounded-2xl bg-[#628141]/10 flex items-center justify-center">
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-3">
 
-                  <Tractor
-                    size={21}
-                    className="text-[#628141]"
-                  />
+                <Send size={21} />
+
+                Request Schedule
+
+              </span>
+            )}
+
+          </button>
+
+          <p className="text-center text-[10px] sm:text-xs text-[#6D7C66] font-bold mt-3">
+            Your request will be saved to your Firebase
+            account and sent to the administrator for approval.
+          </p>
+
+        </section>
+
+        {/* =================================================
+            MAIN GRID
+        ================================================= */}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* =================================================
+              TIME SELECTION
+          ================================================= */}
+
+          <section
+            className="
+              lg:col-span-2
+              bg-white
+              border
+              border-[#DDE4D8]
+              rounded-[2rem]
+              p-5
+              sm:p-7
+              shadow-sm
+            "
+          >
+
+            <div className="flex items-center gap-2 mb-6">
+
+              <Clock
+                size={20}
+                className="text-[#40513B]"
+              />
+
+              <div>
+
+                <h2 className="font-black text-lg text-[#2C3627]">
+                  Time Selection
+                </h2>
+
+                <p className="text-xs text-[#8A9684]">
+                  Choose your rental time.
+                </p>
+
+              </div>
+
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+              {/* START TIME */}
+
+              <div>
+
+                <label
+                  htmlFor="start-time"
+                  className="
+                    block
+                    text-[10px]
+                    font-black
+                    uppercase
+                    tracking-[1.5px]
+                    text-[#6D7C66]
+                    mb-2
+                  "
+                >
+                  Start Time
+                </label>
+
+                <input
+                  id="start-time"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) =>
+                    setStartTime(e.target.value)
+                  }
+                  className="
+                    w-full
+                    rounded-2xl
+                    border
+                    border-[#DDE4D8]
+                    bg-[#F8F9F7]
+                    px-4
+                    py-4
+                    text-lg
+                    font-black
+                    text-[#40513B]
+                    outline-none
+                    focus:border-[#40513B]
+                    focus:ring-4
+                    focus:ring-[#40513B]/10
+                  "
+                />
+
+              </div>
+
+              {/* END TIME */}
+
+              <div>
+
+                <label
+                  htmlFor="end-time"
+                  className="
+                    block
+                    text-[10px]
+                    font-black
+                    uppercase
+                    tracking-[1.5px]
+                    text-[#6D7C66]
+                    mb-2
+                  "
+                >
+                  End Time
+                </label>
+
+                <input
+                  id="end-time"
+                  type="time"
+                  value={endTime}
+                  onChange={(e) =>
+                    setEndTime(e.target.value)
+                  }
+                  className="
+                    w-full
+                    rounded-2xl
+                    border
+                    border-[#DDE4D8]
+                    bg-[#F8F9F7]
+                    px-4
+                    py-4
+                    text-lg
+                    font-black
+                    text-[#40513B]
+                    outline-none
+                    focus:border-[#40513B]
+                    focus:ring-4
+                    focus:ring-[#40513B]/10
+                  "
+                />
+
+              </div>
+
+            </div>
+
+            {/* DURATION */}
+
+            <div
+              className="
+                mt-5
+                rounded-2xl
+                bg-[#F4F6F1]
+                border
+                border-[#DDE4D8]
+                p-5
+              "
+            >
+
+              <div className="flex items-center justify-between gap-4">
+
+                <div className="flex items-center gap-3">
+
+                  <div
+                    className="
+                      w-11
+                      h-11
+                      rounded-xl
+                      bg-white
+                      flex
+                      items-center
+                      justify-center
+                    "
+                  >
+                    <Timer
+                      size={21}
+                      className="text-[#40513B]"
+                    />
+                  </div>
+
+                  <div>
+
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#8A9684]">
+                      Duration
+                    </p>
+
+                    <p className="text-lg font-black text-[#2C3627]">
+                      {formatDuration()}
+                    </p>
+
+                  </div>
 
                 </div>
 
-                <div>
+                <div className="text-right">
 
-                  <h2 className="font-black text-[#40513B]">
-                    Mower
-                  </h2>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#8A9684]">
+                    Selected Schedule
+                  </p>
 
-                  <p className="text-[10px] text-[#6D7C66] font-bold uppercase tracking-wider">
-                    Assigned equipment
+                  <p className="text-sm font-black text-[#40513B] mt-1">
+                    {startTime} - {endTime}
                   </p>
 
                 </div>
 
               </div>
 
-              <span className="text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200">
-                Available
+            </div>
+
+            {/* CONFLICT */}
+
+            {hasConflict && (
+              <div
+                className="
+                  mt-5
+                  rounded-2xl
+                  bg-red-50
+                  border
+                  border-red-200
+                  p-4
+                  flex
+                  items-start
+                  gap-3
+                "
+              >
+
+                <AlertCircle
+                  size={20}
+                  className="
+                    text-red-600
+                    shrink-0
+                    mt-0.5
+                  "
+                />
+
+                <div>
+
+                  <p className="text-sm font-black text-red-700">
+                    Schedule Conflict
+                  </p>
+
+                  <p className="text-xs text-red-600 mt-1">
+                    The selected time overlaps with
+                    another existing reservation.
+                    Please choose another time.
+                  </p>
+
+                </div>
+
+              </div>
+            )}
+
+            {/* INVALID TIME */}
+
+            {durationHours <= 0 && (
+              <div
+                className="
+                  mt-5
+                  rounded-2xl
+                  bg-amber-50
+                  border
+                  border-amber-200
+                  p-4
+                  flex
+                  items-start
+                  gap-3
+                "
+              >
+
+                <AlertCircle
+                  size={20}
+                  className="
+                    text-amber-600
+                    shrink-0
+                    mt-0.5
+                  "
+                />
+
+                <div>
+
+                  <p className="text-sm font-black text-amber-700">
+                    Invalid Time
+                  </p>
+
+                  <p className="text-xs text-amber-600 mt-1">
+                    End time must be later than
+                    start time.
+                  </p>
+
+                </div>
+
+              </div>
+            )}
+
+          </section>
+
+          {/* =================================================
+              MOWER + SUMMARY
+          ================================================= */}
+
+          <section className="space-y-6">
+
+            {/* MOWER CARD */}
+
+            <div
+              className="
+                bg-white
+                border
+                border-[#DDE4D8]
+                rounded-[2rem]
+                p-5
+                sm:p-6
+                shadow-sm
+              "
+            >
+
+              <div className="flex items-center gap-4">
+
+                <div
+                  className="
+                    w-14
+                    h-14
+                    rounded-2xl
+                    bg-[#40513B]/10
+                    flex
+                    items-center
+                    justify-center
+                  "
+                >
+                  <Tractor
+                    size={27}
+                    className="text-[#40513B]"
+                  />
+                </div>
+
+                <div>
+
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#8A9684]">
+                    Available Mower
+                  </p>
+
+                  <h3 className="text-xl font-black text-[#2C3627]">
+                    {MOWER.name}
+                  </h3>
+
+                </div>
+
+              </div>
+
+              <div
+                className="
+                  mt-5
+                  flex
+                  items-center
+                  gap-2
+                  rounded-xl
+                  bg-green-50
+                  border
+                  border-green-100
+                  px-3
+                  py-2.5
+                "
+              >
+
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+
+                <span className="text-xs font-black text-green-700">
+                  Available for scheduling
+                </span>
+
+              </div>
+
+            </div>
+
+            {/* SUMMARY */}
+
+            <div
+              className="
+                bg-white
+                border
+                border-[#DDE4D8]
+                rounded-[2rem]
+                p-5
+                sm:p-6
+                shadow-sm
+              "
+            >
+
+              <div className="flex items-center gap-2 mb-5">
+
+                <CheckCircle2
+                  size={19}
+                  className="text-[#40513B]"
+                />
+
+                <h3 className="font-black text-lg text-[#2C3627]">
+                  Request Summary
+                </h3>
+
+              </div>
+
+              <div className="space-y-4">
+
+                <div className="flex items-start justify-between gap-4">
+
+                  <span className="text-xs font-bold text-[#8A9684]">
+                    Mower
+                  </span>
+
+                  <span className="text-xs font-black text-[#40513B] text-right">
+                    {MOWER.name}
+                  </span>
+
+                </div>
+
+                <div className="h-px bg-[#E8ECE5]" />
+
+                <div className="flex items-start justify-between gap-4">
+
+                  <span className="text-xs font-bold text-[#8A9684]">
+                    Date
+                  </span>
+
+                  <span className="text-xs font-black text-[#40513B] text-right">
+                    {selectedDate.toLocaleDateString(
+                      "en-PH",
+                      {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      }
+                    )}
+                  </span>
+
+                </div>
+
+                <div className="h-px bg-[#E8ECE5]" />
+
+                <div className="flex items-start justify-between gap-4">
+
+                  <span className="text-xs font-bold text-[#8A9684]">
+                    Time
+                  </span>
+
+                  <span className="text-xs font-black text-[#40513B] text-right">
+                    {startTime} - {endTime}
+                  </span>
+
+                </div>
+
+                <div className="h-px bg-[#E8ECE5]" />
+
+                <div className="flex items-start justify-between gap-4">
+
+                  <span className="text-xs font-bold text-[#8A9684]">
+                    Duration
+                  </span>
+
+                  <span className="text-xs font-black text-[#40513B] text-right">
+                    {formatDuration()}
+                  </span>
+
+                </div>
+
+                <div className="h-px bg-[#E8ECE5]" />
+
+                <div className="flex items-start justify-between gap-4">
+
+                  <span className="text-xs font-bold text-[#8A9684]">
+                    Status
+                  </span>
+
+                  <span
+                    className="
+                      text-[10px]
+                      font-black
+                      uppercase
+                      tracking-wider
+                      px-2.5
+                      py-1.5
+                      rounded-lg
+                      bg-amber-50
+                      text-amber-700
+                    "
+                  >
+                    Pending Approval
+                  </span>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </section>
+
+        </div>
+
+        {/* =================================================
+            SCHEDULING PROCESS
+        ================================================= */}
+
+        <section
+          className="
+            mt-6
+            sm:mt-8
+            bg-white
+            border
+            border-[#DDE4D8]
+            rounded-[2rem]
+            p-5
+            sm:p-7
+            shadow-sm
+          "
+        >
+
+          <div className="flex items-center gap-2 mb-6">
+
+            <Shield
+              size={20}
+              className="text-[#40513B]"
+            />
+
+            <div>
+
+              <h2 className="font-black text-lg text-[#2C3627]">
+                Scheduling Process
+              </h2>
+
+              <p className="text-xs text-[#8A9684]">
+                Your request goes through administrator approval.
+              </p>
+
+            </div>
+
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+            {/* STEP 1 */}
+
+            <div
+              className="
+                rounded-2xl
+                bg-[#F4F6F1]
+                p-5
+                border
+                border-[#E3E8DF]
+              "
+            >
+
+              <div className="flex items-center justify-between mb-4">
+
+                <div
+                  className="
+                    w-10
+                    h-10
+                    rounded-xl
+                    bg-[#40513B]
+                    text-white
+                    flex
+                    items-center
+                    justify-center
+                    font-black
+                  "
+                >
+                  1
+                </div>
+
+                <ArrowRight
+                  size={18}
+                  className="text-[#9BA59A]"
+                />
+
+              </div>
+
+              <h3 className="font-black text-[#2C3627]">
+                Submit Request
+              </h3>
+
+              <p className="text-xs text-[#6D7C66] mt-2 leading-relaxed">
+                Select your date and time, then
+                submit your schedule request.
+              </p>
+
+            </div>
+
+            {/* STEP 2 */}
+
+            <div
+              className="
+                rounded-2xl
+                bg-[#F4F6F1]
+                p-5
+                border
+                border-[#E3E8DF]
+              "
+            >
+
+              <div className="flex items-center justify-between mb-4">
+
+                <div
+                  className="
+                    w-10
+                    h-10
+                    rounded-xl
+                    bg-[#40513B]
+                    text-white
+                    flex
+                    items-center
+                    justify-center
+                    font-black
+                  "
+                >
+                  2
+                </div>
+
+                <ArrowRight
+                  size={18}
+                  className="text-[#9BA59A]"
+                />
+
+              </div>
+
+              <h3 className="font-black text-[#2C3627]">
+                Admin Review
+              </h3>
+
+              <p className="text-xs text-[#6D7C66] mt-2 leading-relaxed">
+                The administrator will review your
+                requested mower schedule.
+              </p>
+
+            </div>
+
+            {/* STEP 3 */}
+
+            <div
+              className="
+                rounded-2xl
+                bg-[#F4F6F1]
+                p-5
+                border
+                border-[#E3E8DF]
+              "
+            >
+
+              <div className="flex items-center justify-between mb-4">
+
+                <div
+                  className="
+                    w-10
+                    h-10
+                    rounded-xl
+                    bg-[#40513B]
+                    text-white
+                    flex
+                    items-center
+                    justify-center
+                    font-black
+                  "
+                >
+                  3
+                </div>
+
+                <Check
+                  size={18}
+                  className="text-[#40513B]"
+                />
+
+              </div>
+
+              <h3 className="font-black text-[#2C3627]">
+                Approval
+              </h3>
+
+              <p className="text-xs text-[#6D7C66] mt-2 leading-relaxed">
+                Once approved, you will receive a
+                notification confirming your schedule.
+              </p>
+
+            </div>
+
+          </div>
+
+        </section>
+
+        {/* =================================================
+            NOTIFICATION INFO
+        ================================================= */}
+
+        <section
+          className="
+            mt-6
+            sm:mt-8
+            rounded-[2rem]
+            bg-[#40513B]/5
+            border
+            border-[#40513B]/10
+            p-5
+            sm:p-6
+          "
+        >
+
+          <div className="flex items-start gap-3">
+
+            <div
+              className="
+                w-10
+                h-10
+                rounded-xl
+                bg-white
+                flex
+                items-center
+                justify-center
+                shrink-0
+              "
+            >
+              <Bell
+                size={19}
+                className="text-[#40513B]"
+              />
+            </div>
+
+            <div>
+
+              <h3 className="font-black text-sm text-[#2C3627]">
+                Schedule Notifications
+              </h3>
+
+              <p className="text-xs text-[#6D7C66] mt-1 leading-relaxed">
+                You will receive a notification when
+                your schedule request is submitted and
+                when the administrator approves or rejects it.
+              </p>
+
+            </div>
+
+          </div>
+
+        </section>
+
+        {/* =================================================
+            LOADING RESERVATIONS
+        ================================================= */}
+
+        {loadingReservations && (
+          <div className="mt-6 text-center">
+
+            <div
+              className="
+                inline-flex
+                items-center
+                gap-2
+                rounded-xl
+                bg-white
+                border
+                border-[#DDE4D8]
+                px-4
+                py-3
+                shadow-sm
+              "
+            >
+
+              <span
+                className="
+                  w-4
+                  h-4
+                  border-2
+                  border-[#40513B]/20
+                  border-t-[#40513B]
+                  rounded-full
+                  animate-spin
+                "
+              />
+
+              <span className="text-xs font-bold text-[#6D7C66]">
+                Loading existing schedules...
               </span>
 
             </div>
 
-            <div className="p-5 rounded-2xl bg-[#F8FAF7] border border-[#E5D9B6]/30">
-
-              <p className="text-xl font-black text-[#40513B]">
-                {MOWER.name}
-              </p>
-
-              <div className="flex items-center gap-2 mt-2">
-
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-
-                <span className="text-xs font-black text-green-600">
-                  READY FOR RESERVATION
-                </span>
-
-              </div>
-
-            </div>
-
-          </section>
-
-          {/* REQUEST SUMMARY */}
-
-          <section className="bg-white/95 backdrop-blur-xl rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-7 shadow-lg border border-white/80">
-
-            <div className="flex items-center gap-3 mb-6">
-
-              <div className="w-11 h-11 rounded-2xl bg-[#628141]/10 flex items-center justify-center">
-
-                <Shield
-                  size={20}
-                  className="text-[#628141]"
-                />
-
-              </div>
-
-              <div>
-
-                <h2 className="font-black text-[#40513B]">
-                  Request Summary
-                </h2>
-
-                <p className="text-[10px] text-[#6D7C66] font-bold uppercase tracking-wider">
-                  Review before submitting
-                </p>
-
-              </div>
-
-            </div>
-
-            <div className="space-y-4">
-
-              <div className="flex justify-between gap-4">
-
-                <span className="text-xs text-[#6D7C66] font-bold">
-                  Account
-                </span>
-
-                <span className="text-xs text-[#628141] font-black text-right break-all">
-                  {user.email || "User"}
-                </span>
-
-              </div>
-
-              <div className="h-px bg-[#E5D9B6]/40" />
-
-              <div className="flex justify-between gap-4">
-
-                <span className="text-xs text-[#6D7C66] font-bold">
-                  Date
-                </span>
-
-                <span className="text-xs text-[#40513B] font-black text-right">
-                  {selectedDate.toLocaleDateString(
-                    "en-PH"
-                  )}
-                </span>
-
-              </div>
-
-              <div className="h-px bg-[#E5D9B6]/40" />
-
-              <div className="flex justify-between gap-4">
-
-                <span className="text-xs text-[#6D7C66] font-bold">
-                  Time
-                </span>
-
-                <span className="text-xs text-[#40513B] font-black">
-                  {startTime} - {endTime}
-                </span>
-
-              </div>
-
-              <div className="h-px bg-[#E5D9B6]/40" />
-
-              <div className="flex justify-between gap-4">
-
-                <span className="text-xs text-[#6D7C66] font-bold">
-                  Duration
-                </span>
-
-                <span className="text-xs text-[#40513B] font-black">
-                  {formatDuration()}
-                </span>
-
-              </div>
-
-            </div>
-
-            <div className="mt-5 p-4 rounded-2xl bg-[#628141]/10">
-
-              <div className="flex items-center gap-2">
-
-                <CheckCircle2
-                  size={17}
-                  className="text-[#628141]"
-                />
-
-                <span className="text-xs font-black text-[#40513B]">
-                  Admin approval required
-                </span>
-
-              </div>
-
-              <p className="text-[11px] text-[#6D7C66] font-medium mt-1 ml-6">
-                Your request will be reviewed before the mower can be used.
-              </p>
-
-            </div>
-
-          </section>
-
-        </div>
+          </div>
+        )}
 
       </div>
 
-      {/* =================================================
-          PROCESS
-      ================================================= */}
-
-      <section className="mt-6 bg-[#F8FAF7]/95 backdrop-blur-xl rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-8 border border-[#E5D9B6]/60">
-
-        <div className="flex items-center gap-3 mb-6">
-
-          <div className="w-10 h-10 rounded-xl bg-[#628141]/10 flex items-center justify-center">
-
-            <Bell
-              size={19}
-              className="text-[#628141]"
-            />
-
-          </div>
-
-          <div>
-
-            <h2 className="font-black text-[#40513B]">
-              Scheduling Process
-            </h2>
-
-            <p className="text-xs text-[#6D7C66] font-medium">
-              Three simple steps to reserve ECOMOW
-            </p>
-
-          </div>
-
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-
-          <div className="flex items-start gap-3">
-
-            <span className="flex-shrink-0 w-9 h-9 rounded-xl bg-[#628141]/10 text-[#628141] flex items-center justify-center text-xs font-black">
-              01
-            </span>
-
-            <div>
-
-              <p className="text-sm font-black text-[#40513B]">
-                Choose Date & Time
-              </p>
-
-              <p className="text-xs font-medium text-[#6D7C66] mt-1">
-                Select when you want to operate the mower.
-              </p>
-
-            </div>
-
-          </div>
-
-          <div className="flex items-start gap-3">
-
-            <span className="flex-shrink-0 w-9 h-9 rounded-xl bg-[#628141]/10 text-[#628141] flex items-center justify-center text-xs font-black">
-              02
-            </span>
-
-            <div>
-
-              <p className="text-sm font-black text-[#40513B]">
-                Submit Request
-              </p>
-
-              <p className="text-xs font-medium text-[#6D7C66] mt-1">
-                Send your schedule to the administrator.
-              </p>
-
-            </div>
-
-          </div>
-
-          <div className="flex items-start gap-3">
-
-            <span className="flex-shrink-0 w-9 h-9 rounded-xl bg-[#628141]/10 text-[#628141] flex items-center justify-center text-xs font-black">
-              03
-            </span>
-
-            <div>
-
-              <p className="text-sm font-black text-[#40513B]">
-                Wait for Approval
-              </p>
-
-              <p className="text-xs font-medium text-[#6D7C66] mt-1">
-                You will receive a notification after review.
-              </p>
-
-            </div>
-
-          </div>
-
-        </div>
-
-      </section>
-
-      {/* =================================================
-          SUBMIT
-      ================================================= */}
-
-      <section className="mt-6 sm:mt-8">
-
-        <button
-          onClick={async () => {
-            await requestNotificationPermission();
-            await submitSchedule();
-          }}
-          disabled={
-            saving ||
-            !user ||
-            durationHours <= 0 ||
-            hasConflict ||
-            isPastDate(selectedDate)
-          }
-          className="
-            w-full
-            py-5
-            rounded-2xl
-            sm:rounded-[2rem]
-            bg-[#40513B]
-            text-white
-            font-black
-            uppercase
-            tracking-[2px]
-            text-xs
-            sm:text-sm
-            shadow-xl
-            shadow-[#40513B]/20
-            hover:bg-[#2C3627]
-            active:scale-[0.99]
-            transition-all
-            duration-200
-            disabled:opacity-40
-            disabled:cursor-not-allowed
-          "
-        >
-
-          {saving ? (
-            <span className="flex items-center justify-center gap-3">
-
-              <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-
-              Saving Schedule...
-
-            </span>
-          ) : (
-            <span className="flex items-center justify-center gap-3">
-
-              <Send size={17} />
-
-              Request Schedule
-
-            </span>
-          )}
-
-        </button>
-
-        <p className="text-center text-[10px] text-[#6D7C66] font-bold mt-3">
-          Your request will be saved to your Firebase account and sent to the administrator for approval.
-        </p>
-
-      </section>
-
-      {/* =================================================
-          SUCCESS
-      ================================================= */}
-
-      {msg?.includes("✅") && (
-
-        <div className="mt-6 p-5 sm:p-6 rounded-2xl sm:rounded-[2rem] bg-green-50 border border-green-200 flex gap-4 items-start shadow-sm">
-
-          <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
-
-            <CheckCircle2
-              className="text-green-600"
-              size={22}
-            />
-
-          </div>
-
-          <div>
-
-            <h3 className="font-black text-green-800">
-              Schedule Request Submitted
-            </h3>
-
-            <p className="text-sm text-green-700 mt-1">
-              Your schedule is now waiting for admin approval. You will receive a notification once the admin reviews your request.
-            </p>
-
-          </div>
-
-        </div>
-
-      )}
-
-      {/* =================================================
-          LOADING RESERVATIONS
-      ================================================= */}
-
-      {loadingReservations && (
-        <p className="text-center text-xs text-[#6D7C66] mt-4">
-          Checking schedule availability...
-        </p>
-      )}
-
     </div>
   );
-}
+};
+
+export default ScheduleScreen;

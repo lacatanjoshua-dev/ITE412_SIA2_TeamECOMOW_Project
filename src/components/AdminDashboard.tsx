@@ -42,7 +42,7 @@ import {
 // IMAGES
 // =====================================================
 
-const logoImage = "/images/mowerlogo.png";
+const logoImage = "/images/LOGO2.0.png";
 const bgImage = "/images/mower.jpg";
 
 // =====================================================
@@ -2153,7 +2153,7 @@ export default function AdminDashboard() {
                             items-center
                             justify-center
                             gap-2
-                            py-3.5
+                            py-5
                             rounded-xl
                             border
                             border-red-200
@@ -2194,7 +2194,7 @@ export default function AdminDashboard() {
                             items-center
                             justify-center
                             gap-2
-                            py-3.5
+                            py-5
                             rounded-xl
                             bg-[#40513B]
                             text-white
