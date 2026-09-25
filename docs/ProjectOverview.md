@@ -82,3 +82,26 @@ ESP32
 Mower Hardware
   ↓
 Motors / Sensors
+```
+
+## 3. High-Level System Overview
+## A. Major Modules/Subsystems
+#### 1. Smart Mower Module
+
+The Smart Mower Module is responsible for the physical grass-cutting operations. It includes the ESP32 microcontroller, drive and steering motors, mowing motor, battery system, GPS module, sensors, and emergency stop functionality.
+
+#### 2. Mobile Application Module
+
+The Mobile Application Module provides the user interface for interacting with the ECOMOW system. It allows users to authenticate, connect to the mower, control mower movement and mowing functions, monitor mower status and battery information, schedule operations, and use the emergency STOP function.
+
+#### 3. Cloud Integration Module
+
+The Cloud Integration Module provides communication between the mobile application and the smart mower. It uses Firebase Authentication and Firebase Realtime Database to handle authentication, mower commands, status updates, and user-related system information.
+
+### B. External Systems/Interfaces
+
+The ECOMOW system integrates with Firebase Authentication and Firebase Realtime Database for user authentication, cloud-based communication, mower commands, and status updates. The mobile application communicates with the cloud services, while the ESP32 receives commands and sends mower status information through the cloud integration.
+
+### C. Data Flow Summary
+
+The user interacts with the ECOMOW mobile application to authenticate, control the mower, monitor its status, and manage operations. The mobile application sends commands and requests through Firebase. The ESP32 receives the appropriate commands and controls the mower hardware, including the motors and sensors. The mower then provides status and sensor information back through the ESP32 and Firebase to the mobile application for user monitoring.
