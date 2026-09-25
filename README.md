@@ -9,7 +9,7 @@
 ## Team Members & Roles
 
 - **Joshua Lacatan** — Project Lead
-- **Grace Cabanata** — Documentation Lead
+- **Grace Cabanatan** — Documentation Lead
 - **Jericho Fernandez** — Diagrammer
 - **Danilyn Nibot** — Presenter
 
