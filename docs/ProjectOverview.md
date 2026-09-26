@@ -105,3 +105,14 @@ The ECOMOW system integrates with Firebase Authentication and Firebase Realtime 
 ### C. Data Flow Summary
 
 The user interacts with the ECOMOW mobile application to authenticate, control the mower, monitor its status, and manage operations. The mobile application sends commands and requests through Firebase. The ESP32 receives the appropriate commands and controls the mower hardware, including the motors and sensors. The mower then provides status and sensor information back through the ESP32 and Firebase to the mobile application for user monitoring.
+
+## 4. Integration Pattern Applied
+
+### Integration Pattern Applied
+The ECOMOW system uses the Hub-Spoke integration pattern. Firebase serves as the central cloud service that facilitates communication between the user application and the smart mower components.
+
+### Rationale
+The Hub-Spoke pattern is suitable for ECOMOW because the system consists of multiple components, including the user application, ESP32-based mower controller, sensors, and Firebase services. Using a centralized communication point helps organize the exchange of commands, mower status, sensor data, and user information between the system components. It also reduces the need for every module to communicate directly with every other module.
+
+### Diagram Reference
+The High-Level Architecture Diagram is available in the `/docs` folder as `HighLevelArch.png`.
