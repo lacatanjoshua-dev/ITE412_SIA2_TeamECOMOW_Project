@@ -1,0 +1,126 @@
+{
+  "info": {
+    "_postman_id": "a0d95353-33ba-49c5-b8cc-426f55f28e7e",
+    "name": "ECOMOW Performance Task 7 API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "57475352",
+    "_collection_link": "https://go.postman.co/collection/57475352-a0d95353-33ba-49c5-b8cc-426f55f28e7e?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "POST Mowers",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"name\": \"ECOMOW-02\",\r\n  \"status\": \"offline\",\r\n  \"battery\": 90\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:3001/mowers",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "3001",
+          "path": [
+            "mowers"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "GET Mowers",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "method": "GET",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:3001/mowers",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "3001",
+          "path": [
+            "mowers"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "GET Commands",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:3001/commands",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "3001",
+          "path": [
+            "commands"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "POST Commands",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"mowerId\": 1,\r\n  \"command\": \"forward\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:3001/commands",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "3001",
+          "path": [
+            "commands"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
