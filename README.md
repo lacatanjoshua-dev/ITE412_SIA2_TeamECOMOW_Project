@@ -34,3 +34,9 @@ Clone the repository:
 
 ```bash
 git clone https://github.com/lacatanjoshua-dev/ITE412_SIA2_TeamECOMOW_Project.git
+
+
+
+## Project Lead Contribution
+
+Joshua Lacatan coordinates the project development, repository setup, and system integration activities.
